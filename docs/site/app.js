@@ -51,8 +51,7 @@
   const scrollProgress = document.getElementById('scrollProgress');
   const sections = Array.from(document.querySelectorAll('section.doc-section, .hero'));
   const navLinks = Array.from(document.querySelectorAll('.nav-link'));
-  const tocLinks = Array.from(document.querySelectorAll('.toc-link'));
-
+  
   function handleScroll() {
     // Progress bar
     if (scrollProgress) {
@@ -80,10 +79,7 @@
         link.classList.toggle('active', href === '#' + currentId);
       });
 
-      tocLinks.forEach((link) => {
-        const href = link.getAttribute('href');
-        link.classList.toggle('active', href === '#' + currentId);
-      });
+
     }
   }
 
@@ -91,28 +87,42 @@
   handleScroll();
 
   // =========================================================================
-  // 3. Mobile Navigation Drawer
+  // 3. Mobile Navigation Drawer & Backdrop UX
   // =========================================================================
   const menuToggle = document.getElementById('menuToggle');
   const sidebar = document.getElementById('sidebar');
+  const sidebarClose = document.getElementById('sidebarClose');
+  const sidebarBackdrop = document.getElementById('sidebarBackdrop');
 
-  if (menuToggle && sidebar) {
-    menuToggle.addEventListener('click', () => {
-      sidebar.classList.toggle('open');
-    });
+  function openSidebar() {
+    if (!sidebar) return;
+    sidebar.classList.add('open');
+    if (sidebarBackdrop) sidebarBackdrop.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
 
+  function closeSidebar() {
+    if (!sidebar) return;
+    sidebar.classList.remove('open');
+    if (sidebarBackdrop) sidebarBackdrop.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  if (menuToggle) menuToggle.addEventListener('click', openSidebar);
+  if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+  if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeSidebar);
+
+  if (sidebar) {
     sidebar.querySelectorAll('a').forEach((link) => {
-      link.addEventListener('click', () => {
-        sidebar.classList.remove('open');
-      });
-    });
-
-    document.addEventListener('click', (e) => {
-      if (sidebar.classList.contains('open') && !sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
-        sidebar.classList.remove('open');
-      }
+      link.addEventListener('click', closeSidebar);
     });
   }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) {
+      closeSidebar();
+    }
+  });
 
   // =========================================================================
   // 4. Sidebar Filter
