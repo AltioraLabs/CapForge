@@ -71,10 +71,19 @@ jobs:
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [test, lint]
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Compute image name
+        run: |
+          echo "IMAGE_NAME=ghcr.io/${OWNER,,}/capforge" >> $GITHUB_ENV
+        env:
+          OWNER: '${{ github.repository_owner }}'
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -90,7 +99,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}/capforge-api
+          images: ${{ env.IMAGE_NAME }}
           tags: |
             type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
@@ -122,5 +131,5 @@ jobs:
         # Replace with your actual deployment command
         # e.g., kubectl, docker stack deploy, etc.
         run: |
-          echo "Deploying ghcr.io/${{ github.repository }}/capforge-api:sha-${{ github.sha }}"
+          echo "Deploying ghcr.io/${{ github.repository_owner }}/capforge:sha-${{ github.sha }}"
           echo "Add your deployment command here (kubectl set image, docker stack deploy, etc.)"
