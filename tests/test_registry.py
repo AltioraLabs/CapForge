@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from skillforge.core.models import (
+from capforge.core.models import (
     Capability,
     CapabilityStatus,
     ExecutionMode,
@@ -13,7 +13,7 @@ from skillforge.core.models import (
     TestType,
     VerificationResult
 )
-from skillforge.registry.store import CapabilityRegistry
+from capforge.registry.store import CapabilityRegistry
 
 
 @pytest.fixture
@@ -78,3 +78,42 @@ def test_versioning_and_rollback(temp_registry):
     rolled = temp_registry.rollback("test_versioned_service", "1.0.0")
     assert rolled.version == "1.0.0"
     assert rolled.status == CapabilityStatus.ACTIVE
+
+
+def test_capability_id_validation():
+    """Verify that capability IDs with path traversal or invalid characters are rejected."""
+    with pytest.raises(ValueError, match="Path traversal"):
+        Capability(
+            id="../evil_traversal",
+            name="Evil Traversal",
+            description="Should fail",
+            code_body="def execute(): pass",
+        )
+
+    with pytest.raises(ValueError, match="Invalid capability ID"):
+        Capability(
+            id="bad id with spaces; rm -rf /",
+            name="Bad ID",
+            description="Should fail",
+            code_body="def execute(): pass",
+        )
+
+
+def test_semantic_fuzzy_search(temp_registry):
+    """Verify that character n-gram fuzzy matching finds capabilities despite slight typos."""
+    from capforge.registry.search import CapabilityMatcher
+    cap = Capability(
+        id="kubernetes_ingress_analyzer",
+        name="Kubernetes Ingress Controller Diagnostics",
+        description="Inspects ingress routes and certificates",
+        domain="kubernetes",
+        tags=["k8s", "ingress", "tls"],
+        code_body="def execute(inputs): pass",
+    )
+    temp_registry.register(cap)
+
+    matcher = CapabilityMatcher(temp_registry)
+    # Search with typo: 'kubernets ingrss'
+    matches = matcher.find_matches("kubernets ingrss", threshold=0.15)
+    assert len(matches) > 0
+    assert matches[0][0].id == "kubernetes_ingress_analyzer"

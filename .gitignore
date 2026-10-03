@@ -1,9 +1,14 @@
-# Python
+# ==============================================================================
+# CapForge .gitignore
+# ==============================================================================
+
+# Byte-compiled / optimized files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
+
+# C extensions & distribution / packaging
 build/
 develop-eggs/
 dist/
@@ -20,25 +25,73 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Virtual Environment
+# Virtual environments
 .venv/
 env/
 venv/
 ENV/
+env.bak/
+venv.bak/
 
-# Testing & Coverage
+# Testing, coverage & linters
 .pytest_cache/
 .coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
 htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
 
-# Local databases & artifacts
+# Local databases, storage & runtime artifacts
 data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.sqlite
 data/*.sqlite3
 data/*.json
+!data/.gitkeep
+capabilities/*
+!capabilities/.gitkeep
 
-# IDE
+# Environment variables & secrets (NEVER commit secrets)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+!*.env.example
+
+# Logs
+*.log
+logs/
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE & Editor files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Agent scratch & task artifacts
+scratch/
+.gsd/

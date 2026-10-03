@@ -1,33 +1,33 @@
-Absolutely. I’ve consolidated all of the previous decisions into **one canonical SkillForge specification** and removed the overlaps/inconsistencies between the earlier versions.
+Absolutely. I’ve consolidated all of the previous decisions into **one canonical CapForge specification** and removed the overlaps/inconsistencies between the earlier versions.
 
 This should now be treated as the **baseline system specification** before we move into detailed API/schema/implementation design.
 
-# SkillForge — Canonical System Specification
+# CapForge — Canonical System Specification
 
 ## 1. Project Identity
 
 ### Name
 
-**SkillForge**
+**CapForge**
 
 ### Full name
 
-> **SkillForge — Framework-Agnostic Capability Acquisition, Verification, and Evolution Platform for AI Agents**
+> **CapForge — Framework-Agnostic Capability Acquisition, Verification, and Evolution Platform for AI Agents**
 
 ### One-line pitch
 
-> **SkillForge turns static AI agents into continuously evolving systems that can acquire, verify, reuse, and safely improve their capabilities.**
+> **CapForge turns static AI agents into continuously evolving systems that can acquire, verify, reuse, and safely improve their capabilities.**
 
 ### Core idea
 
-SkillForge is **not another agent framework**.
+CapForge is **not another agent framework**.
 
 It is a **capability evolution layer** that sits alongside existing agentic systems and allows them to acquire new capabilities without retraining their underlying foundation model.
 
 ```text
 Existing Agent
       +
-  SkillForge
+  CapForge
       ↓
 Continuously Evolving Agent
 ```
@@ -66,7 +66,7 @@ Task ends
 
 The experience is often not converted into a **verified, reusable capability**.
 
-SkillForge changes this:
+CapForge changes this:
 
 ```text
 Agent
@@ -100,9 +100,9 @@ The engineering question is:
 
 ---
 
-# 4. What SkillForge Is — and Is Not
+# 4. What CapForge Is — and Is Not
 
-## SkillForge IS
+## CapForge IS
 
 * Capability acquisition infrastructure
 * Skill lifecycle management
@@ -118,7 +118,7 @@ The engineering question is:
 * Cross-framework integration
 * Continuous capability evolution
 
-## SkillForge IS NOT
+## CapForge IS NOT
 
 ```text
 Not a foundation model
@@ -138,7 +138,7 @@ The underlying agent remains responsible for:
 
 > **Reasoning + planning + task execution**
 
-SkillForge becomes responsible for:
+CapForge becomes responsible for:
 
 > **Capability discovery + acquisition + verification + management + evolution**
 
@@ -146,7 +146,7 @@ SkillForge becomes responsible for:
 
 # 5. Canonical Architecture
 
-I would formally define SkillForge as having **three logical planes**.
+I would formally define CapForge as having **three logical planes**.
 
 ## Plane 1 — Execution Plane
 
@@ -183,7 +183,7 @@ Existing workflows
 
 ## Plane 2 — Capability Control Plane
 
-This is the **production-facing portion of SkillForge**.
+This is the **production-facing portion of CapForge**.
 
 It handles:
 
@@ -203,7 +203,7 @@ Runtime monitoring
 
 ## Plane 3 — Learning & Verification Plane
 
-This is the **asynchronous experimental portion of SkillForge**.
+This is the **asynchronous experimental portion of CapForge**.
 
 It handles:
 
@@ -253,7 +253,7 @@ The important architectural rule is:
                                      │
                                      ▼
 ╔══════════════════════════════════════════════════════════════════════════╗
-║                    SKILLFORGE — CAPABILITY CONTROL PLANE               ║
+║                    CAPFORGE — CAPABILITY CONTROL PLANE               ║
 ║                                                                          ║
 ║  ┌────────────────┐       ┌──────────────────┐       ┌───────────────┐ ║
 ║  │ Event & Trace  │──────▶│ Capability       │──────▶│ Capability    │ ║
@@ -316,12 +316,12 @@ The important architectural rule is:
 
 The most important architectural decision is:
 
-> **SkillForge Core must never depend directly on a specific agent framework.**
+> **CapForge Core must never depend directly on a specific agent framework.**
 
 Instead:
 
 ```text
-                     SkillForge Core
+                     CapForge Core
                            │
                     Adapter Interface
                            │
@@ -350,7 +350,7 @@ A2A Adapter
 
 # 8. Four Integration Interfaces
 
-SkillForge should eventually expose four major interfaces.
+CapForge should eventually expose four major interfaces.
 
 ## Interface 1 — Runtime Event API
 
@@ -367,7 +367,7 @@ AutoGen
 Purpose:
 
 ```text
-Agent → SkillForge
+Agent → CapForge
 ```
 
 ---
@@ -383,7 +383,7 @@ Tool validation
 Capability exposure
 ```
 
-SkillForge should both:
+CapForge should both:
 
 ```text
 Consume MCP tools
@@ -405,14 +405,14 @@ For:
 Agent ↔ Agent
 ```
 
-Eventually SkillForge itself can operate as a capability provider.
+Eventually CapForge itself can operate as a capability provider.
 
 ```text
 Agent A
    │
    │ A2A
    ▼
-SkillForge
+CapForge
    │
    ├── discover capability
    ├── acquire capability
@@ -422,7 +422,7 @@ SkillForge
 
 ---
 
-## Interface 4 — SkillForge Adapter SDK
+## Interface 4 — CapForge Adapter SDK
 
 For deep integrations.
 
@@ -517,7 +517,7 @@ skill_rollback
 
 This is one of the most important formal definitions.
 
-SkillForge should distinguish:
+CapForge should distinguish:
 
 ```text
 CAPABILITY
@@ -614,7 +614,7 @@ security_audit
 
 # 11. Skill Is NOT Just a Prompt
 
-A SkillForge skill is a structured capability package.
+A CapForge skill is a structured capability package.
 
 ```text
 Skill
@@ -734,13 +734,13 @@ regression:
   suite: {}
 ```
 
-This manifest becomes one of the **core contracts of SkillForge**.
+This manifest becomes one of the **core contracts of CapForge**.
 
 ---
 
 # 13. Tool Evolution
 
-SkillForge is allowed to:
+CapForge is allowed to:
 
 * discover tools
 * reuse tools
@@ -789,7 +789,7 @@ A generated tool must **never receive production privileges merely because it pa
 
 # 14. Knowledge Acquisition
 
-SkillForge can learn from:
+CapForge can learn from:
 
 ```text
 Web
@@ -881,7 +881,7 @@ This provides **provenance and auditability**.
 
 # 16. Experience Engine
 
-SkillForge must not learn from every event.
+CapForge must not learn from every event.
 
 The Experience Engine determines whether an experience is worth learning from.
 
@@ -926,7 +926,7 @@ Ignore  Learning Queue
 
 # 17. Capability Gap Detection
 
-This is a central SkillForge component.
+This is a central CapForge component.
 
 Example:
 
@@ -1101,13 +1101,13 @@ EVOLVE
 ROLLBACK / RETIRE
 ```
 
-This is the **SkillForge capability lifecycle**.
+This is the **CapForge capability lifecycle**.
 
 ---
 
 # 21. Candidate Skill Construction
 
-Suppose SkillForge needs:
+Suppose CapForge needs:
 
 ```text
 github.security_analysis
@@ -1185,7 +1185,7 @@ Unauthorized side effects
 
 # 23. Automatic Test Generation
 
-SkillForge should generate tests for a candidate capability.
+CapForge should generate tests for a candidate capability.
 
 Example:
 
@@ -1289,7 +1289,7 @@ Dependency analysis     91%
 Repository analysis     95%
 ```
 
-SkillForge generates v2:
+CapForge generates v2:
 
 ```text
 Security analysis       91%
@@ -1462,9 +1462,9 @@ Governance is cross-cutting.
 
 # 29. Critical Security Principle
 
-SkillForge itself must **not autonomously modify its own governance controls**.
+CapForge itself must **not autonomously modify its own governance controls**.
 
-SkillForge may evolve:
+CapForge may evolve:
 
 ```text
 Skills
@@ -1491,16 +1491,16 @@ Otherwise:
 ```text
 Agent
  ↓
-SkillForge
+CapForge
  ↓
-SkillForge modifies itself
+CapForge modifies itself
  ↓
 Security restrictions removed
 ```
 
 Therefore:
 
-> **SkillForge may autonomously expand what an agent can do, but it cannot autonomously redefine the rules governing what it is allowed to do.**
+> **CapForge may autonomously expand what an agent can do, but it cannot autonomously redefine the rules governing what it is allowed to do.**
 
 This should be a fundamental security invariant.
 
@@ -1639,7 +1639,7 @@ If:
 NPM API changes
 ```
 
-SkillForge can identify:
+CapForge can identify:
 
 ```text
 NPM API
@@ -1657,7 +1657,7 @@ This enables **impact analysis before changes are promoted**.
 
 # 33. Versioning
 
-SkillForge should support:
+CapForge should support:
 
 ```text
 v1
@@ -2028,7 +2028,7 @@ Agent:
 ```text
 Capability missing
        ↓
-SkillForge detects gap
+CapForge detects gap
 ```
 
 Then:
@@ -2108,7 +2108,7 @@ Existing Agent
 ```text
 Existing Agent
 +
-SkillForge
+CapForge
 ```
 
 Use the same:
@@ -2125,7 +2125,7 @@ Model temperature/configuration
 The difference should be:
 
 ```text
-SkillForge = ON/OFF
+CapForge = ON/OFF
 ```
 
 This isolates the contribution.
@@ -2222,7 +2222,7 @@ The central long-term measurement:
 ```text
 Initial verified capabilities
             ↓
-        SkillForge
+        CapForge
             ↓
 Final verified capabilities
 ```
@@ -2238,7 +2238,7 @@ The final experiment should look like:
                          │
              ┌───────────┴───────────┐
              │                       │
-        Baseline                 SkillForge
+        Baseline                 CapForge
              │                       │
              ▼                       ▼
         Task Sequence          Task Sequence
@@ -2253,21 +2253,21 @@ The final experiment should look like:
 
 The hypothesis:
 
-> **Agents equipped with SkillForge should acquire and reuse verified capabilities over time, enabling improved performance on later tasks without modifying or retraining the underlying foundation model.**
+> **Agents equipped with CapForge should acquire and reuse verified capabilities over time, enabling improved performance on later tasks without modifying or retraining the underlying foundation model.**
 
 ---
 
-# 43. What makes SkillForge different
+# 43. What makes CapForge different
 
 We should **not** claim:
 
-> "SkillForge invented self-learning skills."
+> "CapForge invented self-learning skills."
 
 That would be incorrect given existing work such as Voyager, Reflexion, Trace2Skill, SkillOpt, SkillMaster, OpenSkill and SkillSmith.
 
 Instead, the contribution is:
 
-> **SkillForge proposes a framework-agnostic capability lifecycle for existing agentic systems, separating production execution from asynchronous capability acquisition, verification, governance, versioning and regression protection.**
+> **CapForge proposes a framework-agnostic capability lifecycle for existing agentic systems, separating production execution from asynchronous capability acquisition, verification, governance, versioning and regression protection.**
 
 The distinguishing lifecycle is:
 
@@ -2311,7 +2311,7 @@ I would **not** initially build:
 ❌ Distributed global capability marketplace
 ❌ Complex multi-agent skill trading
 ❌ Foundation-model fine-tuning
-❌ Automatic modification of SkillForge itself
+❌ Automatic modification of CapForge itself
 ❌ Kafka-based distributed infrastructure from day one
 ❌ Huge microservice architecture
 ```
@@ -2344,7 +2344,7 @@ I would initially implement roughly **six deployable services**, rather than 18 
 
 ```text
 ┌──────────────────────────────────────────────────────────┐
-│                    SkillForge API                       │
+│                    CapForge API                       │
 │                                                        │
 │ Adapter Gateway                                        │
 │ Capability Analyzer                                    │
@@ -2397,7 +2397,7 @@ This gives us production-like separation without prematurely creating a distribu
 
 ---
 
-# 46. SkillForge Dashboard
+# 46. CapForge Dashboard
 
 The eventual dashboard should show:
 
@@ -2460,7 +2460,7 @@ This makes the system explainable rather than a black box.
 
 ---
 
-# 47. Final SkillForge Architecture in One View
+# 47. Final CapForge Architecture in One View
 
 ```text
                               USER
@@ -2483,7 +2483,7 @@ This makes the system explainable rather than a black box.
                     └──────────┼──────────┘
                                ▼
 ╔══════════════════════════════════════════════════════════════════╗
-║                         SKILLFORGE                              ║
+║                         CAPFORGE                              ║
 ║                                                                  ║
 ║                    CAPABILITY CONTROL PLANE                      ║
 ║                                                                  ║
@@ -2535,7 +2535,7 @@ This makes the system explainable rather than a black box.
 
 ---
 
-# 48. The complete SkillForge loop
+# 48. The complete CapForge loop
 
 There are actually **two loops**.
 
@@ -2632,7 +2632,7 @@ Together:
 
 If we have to reduce the entire project to one sentence:
 
-> **SkillForge is a framework-independent capability evolution layer that observes existing agents, identifies capability gaps, acquires or constructs skills and tools, validates them in isolation, governs their promotion, versions them, and makes verified capabilities available to agents without modifying the underlying foundation model.**
+> **CapForge is a framework-independent capability evolution layer that observes existing agents, identifies capability gaps, acquires or constructs skills and tools, validates them in isolation, governs their promotion, versions them, and makes verified capabilities available to agents without modifying the underlying foundation model.**
 
 And the fundamental safety invariant is:
 
@@ -2646,7 +2646,7 @@ Based on everything we've discussed, I would treat these as **final architectura
 
 | Decision              | Final                                                                |
 | --------------------- | -------------------------------------------------------------------- |
-| Product               | SkillForge                                                           |
+| Product               | CapForge                                                           |
 | Purpose               | Capability evolution for existing agents                             |
 | Agent replacement?    | **No**                                                               |
 | Framework-specific?   | **No**                                                               |
@@ -2681,7 +2681,7 @@ Based on everything we've discussed, I would treat these as **final architectura
 | Frontend              | **Next.js/React**                                                    |
 | Core language         | **Python**                                                           |
 | Backend               | **FastAPI**                                                          |
-| Research comparison   | **Existing Agent vs Existing Agent + SkillForge**                    |
+| Research comparison   | **Existing Agent vs Existing Agent + CapForge**                    |
 
 ### The final mental model
 
@@ -2690,7 +2690,7 @@ Based on everything we've discussed, I would treat these as **final architectura
                             │
                             │
                     ┌───────▼───────┐
-                    │   SKILLFORGE  │
+                    │   CAPFORGE  │
                     │               │
                     │ OBSERVE       │
                     │ DISCOVER      │
@@ -2720,4 +2720,4 @@ Based on everything we've discussed, I would treat these as **final architectura
                               Evolution Loop
 ```
 
-**This is the version I would now use as the canonical foundation for the project.** The next engineering step should be to turn this specification into the **formal SkillForge v1 design**: the capability ontology, database schema, event schema, adapter interface, state machines, API contracts, learning workflow, evaluation protocol, and repository/module structure.
+**This is the version I would now use as the canonical foundation for the project.** The next engineering step should be to turn this specification into the **formal CapForge v1 design**: the capability ontology, database schema, event schema, adapter interface, state machines, API contracts, learning workflow, evaluation protocol, and repository/module structure.

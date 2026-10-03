@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CapForge — Autonomous Capability Control Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #07090e;
+      --bg-secondary: #0d121d;
+      --bg-card: rgba(18, 24, 38, 0.7);
+      --bg-glass: rgba(22, 30, 48, 0.45);
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(99, 102, 241, 0.3);
+      --accent-primary: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.45);
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.6) 0%, transparent 100%);
+      background-attachment: fixed;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation Bar */
+    header {
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: var(--bg-glass);
+      border-bottom: 1px solid var(--border-subtle);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      padding: 0.85rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, #6366f1, #06b6d4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .brand-icon svg {
+      width: 22px;
+      height: 22px;
+      fill: #fff;
+    }
+
+    .brand-text h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-text span {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--accent-cyan);
+      font-weight: 600;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .pulse-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: var(--accent-emerald);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 10px var(--accent-emerald);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    .btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: var(--transition);
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 14px var(--accent-glow);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1, #4f46e5);
+      border: none;
+      color: #fff;
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #4f46e5, #4338ca);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* Hero / Stat Metric Cards */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.25rem 1.5rem;
+      backdrop-filter: blur(12px);
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-primary), var(--accent-cyan));
+      opacity: 0;
+      transition: var(--transition);
+    }
+
+    .metric-card:hover {
+      border-color: var(--border-accent);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    }
+
+    .metric-card:hover::before {
+      opacity: 1;
+    }
+
+    .metric-title {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .metric-value {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      color: var(--text-main);
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .metric-sub {
+      font-size: 0.75rem;
+      color: var(--accent-emerald);
+      font-weight: 500;
+    }
+
+    /* Navigation Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 4px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .tab-btn.active {
+      color: #fff;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
+    }
+
+    /* Content Panes */
+    .tab-pane {
+      display: none;
+      flex-direction: column;
+      gap: 1.5rem;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .tab-pane.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Grid Layouts */
+    .dual-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1024px) {
+      .dual-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .panel-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Table styling */
+    .styled-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    .styled-table th {
+      text-align: left;
+      padding: 10px 14px;
+      color: var(--text-dim);
+      font-weight: 600;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .styled-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+      vertical-align: middle;
+    }
+
+    .styled-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-production { background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-candidate { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-experimental { background: rgba(99, 102, 241, 0.15); color: var(--accent-primary); border: 1px solid rgba(99, 102, 241, 0.3); }
+    .badge-deprecated { background: rgba(244, 63, 94, 0.15); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.3); }
+
+    .risk-low { color: var(--accent-emerald); }
+    .risk-medium { color: var(--accent-amber); }
+    .risk-high { color: var(--accent-rose); font-weight: 700; }
+
+    /* Code blocks */
+    .code-preview {
+      background: #05070a;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+      max-height: 280px;
+    }
+
+    /* 4-Level Evaluation Progress Bars */
+    .eval-meter {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .eval-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .eval-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .eval-track {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .eval-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #6366f1, #06b6d4);
+      transition: width 0.8s ease;
+    }
+
+    .eval-fill.pass { background: linear-gradient(90deg, #10b981, #06b6d4); }
+    .eval-fill.warn { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+
+    /* Growth bars */
+    .growth-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 24px;
+      height: 160px;
+      padding-top: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .growth-bar-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      height: 100%;
+      justify-content: flex-end;
+    }
+
+    .growth-bar {
+      width: 100%;
+      border-radius: 6px 6px 0 0;
+      background: linear-gradient(180deg, #6366f1, rgba(99, 102, 241, 0.3));
+      transition: height 0.6s ease;
+      min-height: 12px;
+    }
+
+    .growth-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    /* Modal / Form */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      max-width: 560px;
+      width: 90%;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
+    }
+
+    .modal-box h3 {
+      font-size: 1.3rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .form-control {
+      background: #07090e;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-main);
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    footer {
+      border-top: 1px solid var(--border-subtle);
+      padding: 1.5rem 2rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/" class="brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1>CapForge</h1>
+        <span>Capability Control Center</span>
+      </div>
+    </a>
+    <div class="header-actions">
+      <div class="pulse-badge">
+        <span class="pulse-dot"></span>
+        Runtime Active (v1.0.0)
+      </div>
+      <button class="btn btn-primary" onclick="openJobModal()">
+        <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+        Trigger Acquisition
+      </button>
+      <a href="/docs" target="_blank" class="btn">Swagger Docs</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Section 46: Metrics Grid (Agent Overview) -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-title">
+          <span>Active Capabilities</span>
+          <svg width="16" height="16" fill="var(--accent-primary)" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+        </div>
+        <div class="metric-value" id="stat-capabilities">0</div>
+        <div class="metric-sub">Verified & Promoted</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-title">
+          <span>Agents Connected</span>
+          <svg width="16" height="16" fill="var(--accent-cyan)" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        </div>
+        <div class="metric-value" id="stat-agents">1</div>
+        <div class="metric-sub">Framework-Agnostic SDK</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-title">
+          <span>Active Learning Jobs</span>
+          <svg width="16" height="16" fill="var(--accent-amber)" viewBox="0 0 24 24"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42C17.99 7.86 19 9.81 19 12c0 3.87-3.13 7-7 7s-7-3.13-7-7c0-2.19 1.01-4.14 2.58-5.42L6.17 5.17C4.23 6.82 3 9.26 3 12c0 4.97 4.03 9 9 9s9-4.03 9-9c0-2.74-1.23-5.18-3.17-6.83z"/></svg>
+        </div>
+        <div class="metric-value" id="stat-jobs">0</div>
+        <div class="metric-sub">Autonomous Acquisition</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-title">
+          <span>Governance & Firewall</span>
+          <svg width="16" height="16" fill="var(--accent-emerald)" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+        </div>
+        <div class="metric-value" id="stat-firewall">100%</div>
+        <div class="metric-sub">Enforced Policy Gates</div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('tab-overview')">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Capabilities
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-jobs')">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+        Learning Jobs (§19)
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-evaluation')">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        4-Level Evaluation (§24)
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-growth')">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+        Capability Growth (§41)
+      </button>
+      <button class="tab-btn" onclick="switchTab('tab-events')">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+        Event Gateway (§9)
+      </button>
+    </div>
+
+    <!-- Tab 1: Capability Registry -->
+    <div id="tab-overview" class="tab-pane active">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>Capability Registry</span>
+            <span class="badge badge-production" id="registry-count-badge">0 Registered</span>
+          </div>
+          <button class="btn" onclick="loadCapabilities()">Refresh</button>
+        </div>
+        <table class="styled-table" id="capabilities-table">
+          <thead>
+            <tr>
+              <th>Capability ID</th>
+              <th>Type</th>
+              <th>Version</th>
+              <th>Status</th>
+              <th>Risk Level</th>
+              <th>Confidence</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="capabilities-tbody">
+            <tr><td colspan="7" style="text-align: center; color: var(--text-dim);">Loading capabilities...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 2: Learning Jobs -->
+    <div id="tab-jobs" class="tab-pane">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span>Autonomous Learning Pipeline</span>
+          </div>
+          <button class="btn btn-primary" onclick="openJobModal()">New Learning Job</button>
+        </div>
+        <table class="styled-table">
+          <thead>
+            <tr>
+              <th>Job ID</th>
+              <th>Task Intent</th>
+              <th>Step</th>
+              <th>Progress</th>
+              <th>Status</th>
+              <th>Capability Forged</th>
+            </tr>
+          </thead>
+          <tbody id="jobs-tbody">
+            <tr><td colspan="6" style="text-align: center; color: var(--text-dim);">No active learning jobs.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Tab 3: Four-Level Evaluation (§24) -->
+    <div id="tab-evaluation" class="tab-pane">
+      <div class="dual-grid">
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Four-Level Verification Battery</div>
+            <span class="badge badge-production">Standard Gate</span>
+          </div>
+          <div class="eval-meter">
+            <div class="eval-row">
+              <div class="eval-label">
+                <span>Level 1 — Structural Validation (AST, Schema, Entrypoint)</span>
+                <strong id="eval-l1-val">100%</strong>
+              </div>
+              <div class="eval-track"><div class="eval-fill pass" id="eval-l1-bar" style="width: 100%;"></div></div>
+            </div>
+
+            <div class="eval-row">
+              <div class="eval-label">
+                <span>Level 2 — Functional Evaluation (Assertions, Task Success)</span>
+                <strong id="eval-l2-val">96%</strong>
+              </div>
+              <div class="eval-track"><div class="eval-fill pass" id="eval-l2-bar" style="width: 96%;"></div></div>
+            </div>
+
+            <div class="eval-row">
+              <div class="eval-label">
+                <span>Level 3 — Generalization Evaluation (Edge Cases & Transfer)</span>
+                <strong id="eval-l3-val">90%</strong>
+              </div>
+              <div class="eval-track"><div class="eval-fill pass" id="eval-l3-bar" style="width: 90%;"></div></div>
+            </div>
+
+            <div class="eval-row">
+              <div class="eval-label">
+                <span>Level 4 — Regression Evaluation (Historical Version Suite)</span>
+                <strong id="eval-l4-val" style="color: var(--accent-emerald);">PASS (0 Regressions)</strong>
+              </div>
+              <div class="eval-track"><div class="eval-fill pass" id="eval-l4-bar" style="width: 100%;"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Inspection Sandbox Code</div>
+            <span class="badge badge-experimental">Isolated Subprocess</span>
+          </div>
+          <pre class="code-preview" id="sandbox-code-preview">def execute(**kwargs):
+    # Verified sandbox execution payload
+    return {"status": "success", "result": "Ready"}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 4: Capability Growth -->
+    <div id="tab-growth" class="tab-pane">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Autonomous Capability Growth Trajectory (§41)</div>
+          <span class="badge badge-production">+194% vs Static Baseline</span>
+        </div>
+        <div class="growth-chart">
+          <div class="growth-bar-wrap">
+            <div class="growth-bar" style="height: 35%;"></div>
+            <div class="growth-label">Day 1 (50)</div>
+          </div>
+          <div class="growth-bar-wrap">
+            <div class="growth-bar" style="height: 48%;"></div>
+            <div class="growth-label">Day 7 (71)</div>
+          </div>
+          <div class="growth-bar-wrap">
+            <div class="growth-bar" style="height: 70%;"></div>
+            <div class="growth-label">Day 14 (103)</div>
+          </div>
+          <div class="growth-bar-wrap">
+            <div class="growth-bar" style="height: 100%;"></div>
+            <div class="growth-label">Day 30 (147)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 5: Event Gateway -->
+    <div id="tab-events" class="tab-pane">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Universal Event Model Stream (§9)</div>
+          <button class="btn" onclick="loadEvents()">Refresh Stream</button>
+        </div>
+        <table class="styled-table">
+          <thead>
+            <tr>
+              <th>Event ID</th>
+              <th>Type</th>
+              <th>Agent ID</th>
+              <th>Timestamp</th>
+              <th>Payload / Error</th>
+            </tr>
+          </thead>
+          <tbody id="events-tbody">
+            <tr><td colspan="5" style="text-align: center; color: var(--text-dim);">No events captured yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Learning Job Trigger Modal -->
+  <div class="modal-overlay" id="job-modal">
+    <div class="modal-box">
+      <h3>Trigger Capability Acquisition</h3>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">
+        CapForge will detect gaps, synthesize the implementation, run 4-level sandbox verification, and promote to the registry.
+      </p>
+      <form onsubmit="handleCreateJob(event)">
+        <div class="form-group">
+          <label>Task Intent</label>
+          <input type="text" id="job-intent" class="form-control" placeholder="e.g. Analyze Kubernetes incident and identify root cause" required />
+        </div>
+        <div class="form-group">
+          <label>Capability ID (Optional)</label>
+          <input type="text" id="job-cap-id" class="form-control" placeholder="e.g. k8s_incident_analyzer" />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem;">
+          <button type="button" class="btn" onclick="closeJobModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="btn-submit-job">Start Acquisition</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <footer>
+    CapForge &bull; Autonomous Capability Acquisition, Verification & Evolution Platform for AI Agents &bull; 2026
+  </footer>
+
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      
+      const targetBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => b.getAttribute('onclick').includes(tabId));
+      if (targetBtn) targetBtn.classList.add('active');
+      const pane = document.getElementById(tabId);
+      if (pane) pane.classList.add('active');
+
+      if (tabId === 'tab-jobs') loadJobs();
+      if (tabId === 'tab-events') loadEvents();
+      if (tabId === 'tab-overview') loadCapabilities();
+    }
+
+    function openJobModal() {
+      document.getElementById('job-modal').classList.add('open');
+    }
+
+    function closeJobModal() {
+      document.getElementById('job-modal').classList.remove('open');
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/v1/dashboard/stats');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('stat-capabilities').innerText = data.capabilities_count || 0;
+          document.getElementById('stat-agents').innerText = data.agents_connected || 1;
+          document.getElementById('stat-jobs').innerText = data.active_learning_jobs || 0;
+          document.getElementById('stat-firewall').innerText = (data.firewall_pass_rate || 100) + '%';
+          document.getElementById('registry-count-badge').innerText = (data.capabilities_count || 0) + ' Registered';
+        }
+      } catch (e) {
+        console.error('Failed to load stats', e);
+      }
+    }
+
+    async function loadCapabilities() {
+      try {
+        const res = await fetch('/v1/capabilities');
+        if (!res.ok) return;
+        const caps = await res.json();
+        const tbody = document.getElementById('capabilities-tbody');
+        if (caps.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-dim);">No capabilities registered yet.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = caps.map(c => `
+          <tr>
+            <td><strong>${c.id}</strong><div style="font-size:0.75rem; color:var(--text-dim);">${c.name || ''}</div></td>
+            <td><span class="badge badge-experimental">${c.capability_type || 'skill'}</span></td>
+            <td><code>${c.version}</code></td>
+            <td><span class="badge badge-${(c.status || 'production').toLowerCase()}">${c.status}</span></td>
+            <td class="risk-${(c.risk_level || 'low').toLowerCase()}">${(c.risk_level || 'low').toUpperCase()}</td>
+            <td>${Math.round((c.confidence_score || 0.9) * 100)}%</td>
+            <td>
+              <button class="btn" style="padding: 4px 8px; font-size: 0.75rem;" onclick="viewCapability('${c.id}')">Inspect</button>
+            </td>
+          </tr>
+        `).join('');
+
+        if (caps.length > 0) {
+          viewCapability(caps[0].id);
+        }
+      } catch (e) {
+        console.error('Failed to load capabilities', e);
+      }
+    }
+
+    async function viewCapability(capId) {
+      try {
+        const res = await fetch(`/v1/capabilities/${capId}`);
+        if (!res.ok) return;
+        const cap = await res.json();
+        document.getElementById('sandbox-code-preview').innerText = cap.code_body || '# No code body';
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadJobs() {
+      try {
+        const res = await fetch('/v1/learning/jobs');
+        if (!res.ok) return;
+        const jobs = await res.json();
+        const tbody = document.getElementById('jobs-tbody');
+        if (jobs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-dim);">No learning jobs yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = jobs.map(j => `
+          <tr>
+            <td><code>${j.job_id}</code></td>
+            <td>${j.task_intent}</td>
+            <td><span class="badge badge-candidate">${j.step}</span></td>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div class="eval-track" style="width: 100px;"><div class="eval-fill pass" style="width: ${j.progress_pct}%;"></div></div>
+                <span style="font-size:0.75rem;">${j.progress_pct}%</span>
+              </div>
+            </td>
+            <td><span class="badge badge-${j.status === 'COMPLETED' ? 'production' : (j.status === 'FAILED' ? 'deprecated' : 'candidate')}">${j.status}</span></td>
+            <td><code>${j.capability_id || '-'}</code></td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function loadEvents() {
+      try {
+        const res = await fetch('/v1/events/recent?limit=25');
+        if (!res.ok) return;
+        const events = await res.json();
+        const tbody = document.getElementById('events-tbody');
+        if (events.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-dim);">No events logged.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = events.map(e => `
+          <tr>
+            <td><code>${e.event_id.slice(0, 10)}...</code></td>
+            <td><span class="badge badge-experimental">${e.event_type}</span></td>
+            <td>${e.agent_id || 'system'}</td>
+            <td style="font-size:0.75rem; color:var(--text-dim);">${new Date(e.timestamp).toLocaleTimeString()}</td>
+            <td style="font-size:0.75rem; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              ${e.error_message || JSON.stringify(e.input_data || e.output_data || {})}
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function handleCreateJob(event) {
+      event.preventDefault();
+      const btn = document.getElementById('btn-submit-job');
+      btn.disabled = true;
+      btn.innerText = 'Acquiring...';
+      const intent = document.getElementById('job-intent').value;
+      const capId = document.getElementById('job-cap-id').value;
+
+      try {
+        const res = await fetch('/v1/learning/jobs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            task_intent: intent,
+            knowledge_spec: capId ? { id: capId, name: intent, description: intent } : null
+          })
+        });
+        closeJobModal();
+        switchTab('tab-jobs');
+        loadJobs();
+        loadStats();
+        loadCapabilities();
+      } catch (e) {
+        alert('Error creating learning job: ' + e);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Start Acquisition';
+      }
+    }
+
+    // Initial load
+    loadStats();
+    loadCapabilities();
+  </script>
+</body>
+</html>

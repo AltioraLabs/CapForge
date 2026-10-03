@@ -1,0 +1,128 @@
+# CapForge — Version History
+
+## v1.1.0 — Production Hardening (Current)
+
+> Released: 2026-10-03
+
+### What Changed
+
+**Security — Auth Persistence (Breaking Fix)**
+- Rewrote `AuthManager` to use SQLite-backed `AuthStore` instead of in-memory dict
+- Auth keys now survive server restarts and are consistent across process restarts
+- Removed silent dev-mode auth bypass as the default — now requires `CAPFORGE_DEV_MODE=true` (explicit opt-in)
+- `authorize()` re-fetches revocation status from DB on every call — stale in-memory records cannot bypass revocation
+- Added `require_roles()` FastAPI dependency that enforces role hierarchy on protected routes
+- Added proper `WWW-Authenticate: ApiKey` headers on 401 responses
+
+**AI — Real LLM Code Synthesis**
+- `CapabilitySynthesizer` now calls Gemini API (`gemini-1.5-flash`) when `CAPFORGE_LLM_PROVIDER=gemini` and `GEMINI_API_KEY` is set
+- Added OpenAI backend as secondary option (`CAPFORGE_LLM_PROVIDER=openai`)
+- LLM output validated with AST parser before creating `Capability` object — invalid code falls back to template
+- Synthesis method (`gemini` | `openai` | `template`) is tagged in capability metadata
+- Template fallback is now clearly annotated so users know real LLM isn't configured
+
+**Registry — Correctness & Scalability**
+- Fixed `list_capabilities()` GROUP BY bug — was using non-standard SQLite extension that could return wrong rows. Now uses proper correlated subquery.
+- Added `limit` / `offset` pagination to `list_capabilities()` and `GET /v1/capabilities`
+- `SemanticVectorIndex.on_capability_registered()` hook — new capabilities are auto-indexed without server restart
+- Added `rebuild_index()` and `invalidate_capability()` methods for operational management
+
+**API — Rate Limiting & Observability**
+- Added `slowapi` rate limiting middleware (configurable via env vars)
+- `GET /health` updated to v1.1.0 and includes `dev_mode` field
+- Added `GET /health/ready` readiness probe for Kubernetes/load balancer use
+- `FastAPI` lifespan context logs startup state (LLM backend, Redis status, dev mode)
+- `GET /v1/capabilities` now supports `?limit=N&offset=M` pagination
+
+**Infrastructure**
+- `docker-compose.prod.yml` — complete production stack: Redis + 2x CapForge API + Nginx
+- `deploy/nginx.conf` — reverse proxy with security headers, gzip, H2, SSL placeholder
+- `.env.example` — complete environment variable documentation
+- `.github/workflows/ci.yml` — GitHub Actions: test → lint → Docker build → deploy
+- `pyproject.toml` bumped to v1.1.0 with `[project.optional-dependencies]` dev extras
+
+**Tests (+22 new)**
+- `tests/test_fault_injection.py` — 7 chaos tests: sandbox timeout, circuit breaker, firewall quarantine, vector auto-refresh, workflow execution, pagination
+- `tests/test_auth_enforcement.py` — 7 tests: 401 on missing key, 401 on invalid key, 401 on revoked key, 403 role violations (AGENT_RUNNER, AUDITOR), ADMIN bypass, persistence across restart
+- `tests/test_e2e_demo.py` — 9 step end-to-end lifecycle: gap analysis → learning job → evaluate → promote → execute → versions → hybrid search → health → manifest
+
+### Total Test Count: 131 (109 baseline + 22 new)
+
+---
+
+## v1.0.0 — General Availability
+
+> Released: 2026-10-02
+
+### What Was Built
+
+**Enterprise Auth Mesh**
+- `server/auth.py` — cryptographic SHA-256 API keys, RBAC roles (ADMIN/OPERATOR/AGENT_RUNNER/AUDITOR)
+- Tenant namespace boundary enforcement
+- `GET/POST /v1/auth/keys` provisioning and revocation endpoints
+
+**Hybrid Semantic Search**
+- `registry/vector_store.py` — `DenseVectorEmbeddingEngine` + `SemanticVectorIndex`
+- BM25 lexical matching + dense cosine similarity hybrid scoring with configurable alpha blend
+- `POST /v1/capabilities/hybrid-search` endpoint
+
+**Diagnostics CLI**
+- `capforge health` — 5-domain health audit (Storage, Sandbox, Governance, Telemetry, Events)
+- `capforge version` — version and runtime info
+
+**Full Feature Stack**
+- All core systems operational: 4-Level Evaluator, Firewall, RiskEngine, MCP, DurableWorkflow, CapabilityGraph, OTel telemetry
+- 109 tests passing across 21 test files
+
+---
+
+## v0.4.0 — Learning & Evolution Systems
+
+> Released: 2026-10-02
+
+### What Was Built
+- Durable workflow engine with checkpoint/resume
+- Gap detection and acquisition engine
+- Version management with L4 regression gate
+- Events broker with Redis/in-memory dual mode
+- MCP JSON-RPC 2.0 server (5 tools)
+- OpenAI + CrewAI adapters
+
+---
+
+## v0.3.0 — Verification & Security
+
+> Released: 2026-10-01
+
+### What Was Built
+- 4-level evaluation battery (Structural, Functional, Generalization, Regression)
+- SandboxRunner (in-process + subprocess isolation)
+- DockerSandbox containment
+- RiskEngine AST security scanner
+- CapabilityFirewall with circuit breaker + auto-rollback
+- OTel telemetry with W3C trace propagation
+
+---
+
+## v0.2.0 — Registry & Storage
+
+> Released: 2026-10-01
+
+### What Was Built
+- SQLite WAL capability registry
+- Versioned capability storage with lineage
+- Trigram fuzzy search
+- FastAPI REST API (register, evaluate, promote, execute, rollback)
+- Manifest YAML import/export
+
+---
+
+## v0.1.0 — Foundations
+
+> Released: 2026-10-01
+
+### What Was Built
+- Core Pydantic v2 data models (`Capability`, `ParameterSpec`, `TestCase`, `ToolRequirement`)
+- `CapabilitySynthesizer` (API + intent-based)
+- Project scaffold, venv, pyproject.toml
+- Initial test infrastructure

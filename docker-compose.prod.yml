@@ -1,0 +1,132 @@
+version: "3.9"
+
+# CapForge Production Docker Compose Stack
+#
+# Services:
+#   - redis       : Event streaming, rate limiting, broker
+#   - capforge  : Main API (2 replicas behind nginx)
+#   - nginx       : SSL termination, load balancing, rate limit headers
+#
+# Usage:
+#   1. cp .env.example .env && edit .env with your keys
+#   2. docker compose -f docker-compose.prod.yml up -d
+#   3. Check logs: docker compose -f docker-compose.prod.yml logs -f capforge
+#   4. Health: curl http://localhost/health
+
+x-common-env: &common-env
+  CAPFORGE_BASE_DIR: /app
+  CAPFORGE_DATA_DIR: /app/data
+  CAPFORGE_DB_PATH: /app/data/capforge.db
+  CAPFORGE_AUTH_DB_PATH: /app/data/capforge_auth.db
+  CAPFORGE_CAPABILITIES_DIR: /app/capabilities
+  CAPFORGE_API_HOST: "0.0.0.0"
+  CAPFORGE_API_PORT: "8000"
+  CAPFORGE_LOG_LEVEL: "${CAPFORGE_LOG_LEVEL:-INFO}"
+  CAPFORGE_DEV_MODE: "${CAPFORGE_DEV_MODE:-false}"
+  CAPFORGE_LLM_PROVIDER: "${CAPFORGE_LLM_PROVIDER:-template}"
+  CAPFORGE_LLM_MODEL: "${CAPFORGE_LLM_MODEL:-gemini-1.5-flash}"
+  GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+  OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+  CAPFORGE_REDIS_URL: "redis://:${REDIS_PASSWORD:-capforge_redis}@redis:6379/0"
+  CAPFORGE_RATE_LIMIT_DEFAULT: "${CAPFORGE_RATE_LIMIT_DEFAULT:-100/minute}"
+  CAPFORGE_RATE_LIMIT_SYNTHESIS: "${CAPFORGE_RATE_LIMIT_SYNTHESIS:-10/minute}"
+  CAPFORGE_RATE_LIMIT_EXECUTE: "${CAPFORGE_RATE_LIMIT_EXECUTE:-60/minute}"
+  CAPFORGE_SANDBOX_TIMEOUT: "${CAPFORGE_SANDBOX_TIMEOUT:-15.0}"
+  CAPFORGE_MAX_REPAIR_ITERATIONS: "3"
+  CAPFORGE_REQUIRE_REGRESSION: "true"
+  CAPFORGE_MAX_AUTO_PROMOTE_RISK: "${CAPFORGE_MAX_AUTO_PROMOTE_RISK:-LOW}"
+
+services:
+  # ---------------------------------------------------------------------------
+  # Redis — Event Broker + Rate Limit State
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass "${REDIS_PASSWORD:-capforge_redis}"
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+      --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-capforge_redis}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - capforge_net
+
+  # ---------------------------------------------------------------------------
+  # CapForge API
+  # ---------------------------------------------------------------------------
+  capforge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    command: >
+      python -m uvicorn capforge.server.app:app
+      --host 0.0.0.0
+      --port 8000
+      --workers 2
+      --log-level info
+      --access-log
+    environment:
+      <<: *common-env
+    volumes:
+      - capforge_data:/app/data
+      - capforge_caps:/app/capabilities
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; r=httpx.get('http://localhost:8000/health/ready', timeout=5); r.raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    networks:
+      - capforge_net
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  # ---------------------------------------------------------------------------
+  # Nginx — Reverse Proxy + Rate Limit Headers
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/ssl:/etc/nginx/ssl:ro   # Mount your SSL certs here
+    depends_on:
+      - capforge
+    networks:
+      - capforge_net
+
+volumes:
+  capforge_data:
+    driver: local
+  capforge_caps:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  capforge_net:
+    driver: bridge
