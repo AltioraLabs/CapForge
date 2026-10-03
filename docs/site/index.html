@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CapForge Documentation | Autonomous Capability Evolution for AI Agents</title>
+  <meta name="description" content="Production-grade capability evolution infrastructure for AI agents: autonomous gap discovery, AST synthesis, 5-level verification, closed-loop repair, PyO3 Rust transpilation, and native MCP support.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Reading Progress Bar -->
+  <div id="scrollProgress"></div>
+
+  <!-- Header / Topbar -->
+  <header class="topbar">
+    <button class="icon-btn menu-toggle" id="menuToggle" aria-label="Toggle navigation menu">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+
+    <a class="brand" href="#overview">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <span>CapForge</span>
+      <small>docs</small>
+    </a>
+
+    <span class="ver-badge">v1.2.0-prod</span>
+
+    <nav class="topbar-nav">
+      <a href="#quickstart">Quickstart</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#sdk">Python SDK</a>
+      <a href="#mcp">MCP Hub</a>
+      <a href="#simulator">Simulator</a>
+      <a href="#rest">REST API</a>
+    </nav>
+
+    <div class="topbar-spacer"></div>
+
+    <div class="status-pill">
+      <span class="pulse-dot"></span>
+      <span>234 Tests Green</span>
+    </div>
+
+    <button class="search-btn" data-search-open aria-label="Open search dialog">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span>Search docs...</span>
+      <kbd>Ctrl K</kbd>
+    </button>
+
+    <button class="icon-btn" id="themeToggle" aria-label="Toggle dark/light theme">
+      <!-- Icon set by app.js -->
+    </button>
+
+    <a class="github-btn" href="https://github.com/abhay-2108/CapForge" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      <span>GitHub</span>
+    </a>
+  </header>
+
+  <div class="docs-layout">
+    <!-- Left Navigation Sidebar -->
+    <nav class="sidebar" id="sidebar" aria-label="Documentation navigation">
+      <div class="sidebar-filter-wrap">
+        <svg class="sidebar-filter-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="sidebar-filter" id="sidebarFilter" placeholder="Filter documentation..." aria-label="Filter documentation">
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Get Started</div>
+        <a class="nav-link active" href="#overview">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <span>Overview &amp; Mission</span>
+        </a>
+        <a class="nav-link" href="#quickstart">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>5-Min Quickstart</span>
+          <span class="nav-badge core">Core</span>
+        </a>
+        <a class="nav-link" href="#install">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Installation</span>
+        </a>
+        <a class="nav-link" href="#config">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Configuration (.env)</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Core Architecture</div>
+        <a class="nav-link" href="#architecture">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          <span>Three-Plane Architecture</span>
+        </a>
+        <a class="nav-link" href="#ontology">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span>Capability Ontology</span>
+        </a>
+        <a class="nav-link" href="#verification">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <span>5-Level Verification</span>
+          <span class="nav-badge hot">5-Stage</span>
+        </a>
+        <a class="nav-link" href="#repair">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <span>Closed-Loop Self-Repair</span>
+        </a>
+        <a class="nav-link" href="#trust-chain">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Trust Chain &amp; Security</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Developer Guides</div>
+        <a class="nav-link" href="#sdk">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span>Python SDK Client</span>
+        </a>
+        <a class="nav-link" href="#langgraph">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          <span>LangGraph Integration</span>
+        </a>
+        <a class="nav-link" href="#crewai">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>CrewAI Integration</span>
+        </a>
+        <a class="nav-link" href="#openai">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+          <span>OpenAI &amp; Anthropic</span>
+        </a>
+        <a class="nav-link" href="#mcp">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+          <span>MCP Server (STDIO &amp; SSE)</span>
+          <span class="nav-badge new">MCP 2.0</span>
+        </a>
+        <a class="nav-link" href="#webhooks">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span>Webhooks &amp; Events</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Optimization &amp; Advanced</div>
+        <a class="nav-link" href="#profiler">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Runtime Profiling &amp; SLA</span>
+          <span class="nav-badge new">New</span>
+        </a>
+        <a class="nav-link" href="#transpiler">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          <span>Python-to-Rust PyO3</span>
+          <span class="nav-badge hot">50x JIT</span>
+        </a>
+        <a class="nav-link" href="#formal">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>SMT Formal Verification</span>
+        </a>
+        <a class="nav-link" href="#mutation">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          <span>Continuous Mutation Testing</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Interactive Lab</div>
+        <a class="nav-link" href="#simulator">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <span>Capability Simulator</span>
+          <span class="nav-badge core">Live</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title">Operations &amp; Reference</div>
+        <a class="nav-link" href="#rest">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <span>REST API Reference</span>
+        </a>
+        <a class="nav-link" href="#cli">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span>CLI Reference</span>
+        </a>
+        <a class="nav-link" href="#deploy">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          <span>Deploy &amp; Docker</span>
+        </a>
+        <a class="nav-link" href="#telemetry">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>Telemetry &amp; OTel</span>
+        </a>
+        <a class="nav-link" href="#security">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Security &amp; Governance</span>
+        </a>
+        <a class="nav-link" href="#faq">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span>Troubleshooting &amp; FAQ</span>
+        </a>
+      </div>
+    </nav>
+
+    <!-- Center Main Content -->
+    <main class="content-area">
+      <!-- HERO -->
+      <div class="hero" id="overview">
+        <div class="eyebrow">
+          <span class="pulse-dot"></span>
+          <span>Framework-Agnostic &bull; v1.2.0-prod &bull; Python 3.10&ndash;3.12</span>
+        </div>
+        <h1>Turn static agents into <span class="grad">autonomously evolving</span> systems.</h1>
+        <p class="lead">
+          CapForge is enterprise capability-evolution infrastructure. When your agent encounters a task it cannot solve, CapForge discovers the capability gap, synthesizes type-safe code, validates it across a <strong>5-level verification pipeline</strong> (including SMT formal invariants &amp; mutation testing), governs safety, and promotes versioned, reusable capabilities &mdash; <strong>without retraining your foundation model</strong>.
+        </p>
+
+        <div class="badge-cloud">
+          <span class="badge-tag highlight">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+            234/234 Automated Tests Green
+          </span>
+          <span class="badge-tag">Pydantic v2 Core</span>
+          <span class="badge-tag">FastAPI REST Server</span>
+          <span class="badge-tag">SQLite WAL / PostgreSQL</span>
+          <span class="badge-tag">Docker Container Sandbox</span>
+          <span class="badge-tag">MCP 2024-11-05 (STDIO &amp; SSE)</span>
+          <span class="badge-tag">OpenTelemetry GenAI Spans</span>
+          <span class="badge-tag">Apache-2.0 License</span>
+        </div>
+
+        <div class="hero-install-box">
+          <span class="prompt">$</span>
+          <code>pip install capforge</code>
+          <button class="hero-copy-btn" data-copy-text="pip install capforge" aria-label="Copy install command" title="Copy to clipboard">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
+
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#quickstart">
+            <span>5-Minute Quickstart</span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </a>
+          <a class="btn btn-secondary" href="#install">Installation Guide</a>
+          <a class="btn btn-secondary" href="#simulator">Live Interactive Lab</a>
+          <a class="btn btn-secondary" href="#sdk">Python SDK Docs</a>
+        </div>
+
+        <div class="feature-grid">
+          <div class="feature-card">
+            <div class="feature-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+            <h4>1. Discover Gaps</h4>
+            <p>AST task analysis, failure pattern mining, semantic capability matching, and dependency blast-radius calculation.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <h4>2. Synthesize &amp; Repair</h4>
+            <p>Model-driven code generation (Gemini / OpenAI / Ollama) with 3-pass closed-loop AST self-repair and schema normalization.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <h4>3. 5-Level Verification</h4>
+            <p>L0 CodeGuardian security, L1 SMT formal invariants (Z3/SymPy), L2 Docker sandbox, L3 fuzzing, L4 regression, L5 mutation testing.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            </div>
+            <h4>4. Optimize to Rust</h4>
+            <p>Telemetry-driven profiler flags SLA latency bottlenecks and compiles computational hot-paths into native PyO3 Rust extensions.</p>
+          </div>
+        </div>
+
+        <div class="callout tip">
+          <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <div class="callout-content">
+            <strong>CapForge IS vs IS NOT</strong>
+            <p><strong>IS:</strong> Capability acquisition, 5-level verification, hot-path optimization, versioning, and trust infrastructure. <strong>IS NOT:</strong> An orchestrator (LangGraph/CrewAI), a prompt engineering library, or a foundation model. CapForge sits directly underneath your agent systems as their runtime capability forge.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUICKSTART -->
+      <section class="doc-section" id="quickstart">
+        <div class="eyebrow">Get Started</div>
+        <h2>5-Minute Quickstart</h2>
+        <p>Three straightforward moves: decorate a function with <code class="inline">@capability</code> &rarr; register and verify &rarr; execute inside an isolated sandbox with zero regression risk.</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <div class="code-tabs">
+              <button class="code-tab-btn active" data-pane="q-sdk">Python SDK</button>
+              <button class="code-tab-btn" data-pane="q-remote">Remote REST Client</button>
+              <button class="code-tab-btn" data-pane="q-cli">CLI Command</button>
+              <button class="code-tab-btn" data-pane="q-curl">cURL</button>
+            </div>
+            <span class="code-lang-tag">python</span>
+          </div>
+
+          <div class="code-pane active" id="q-sdk">
+            <pre><code>from capforge import CapForgeClient, capability
+
+# 1. Define a self-contained capability with typed parameters and verification tests
+@capability(
+    id="sentiment_analyzer",
+    domain="nlp",
+    risk_level="LOW",
+    tests=[
+        {
+            "id": "t1",
+            "inputs": {"text": "I love using CapForge for autonomous agents!"},
+            "expected_keys": ["sentiment", "confidence"],
+            "assert_expression": "output['sentiment'] == 'positive' and output['confidence'] > 0.8"
+        }
+    ]
+)
+def analyze_sentiment(text: str = "") -> dict:
+    text_lower = text.lower()
+    is_positive = any(word in text_lower for word in ["love", "great", "excellent", "fast"])
+    return {
+        "text": text,
+        "sentiment": "positive" if is_positive else "neutral",
+        "confidence": 0.95 if is_positive else 0.50
+    }
+
+# 2. Open embedded client (SQLite WAL + Docker/Subprocess Sandbox)
+with CapForgeClient() as client:
+    # Scan with CodeGuardian AST -> Run 5-level verification -> Promote to ACTIVE
+    client.register(analyze_sentiment, promote=True)
+
+    # 3. Execute safely in isolated sandbox
+    response = client.execute("sentiment_analyzer", {"text": "CapForge makes agents self-healing!"})
+    print("Execution Output:", response.output)
+    print("Status:", response.status)
+    print("Latency:", f"{response.latency_ms:.2f} ms")
+
+    # 4. Export directly to OpenAI function calling format
+    openai_tool = client.to_openai_tool("sentiment_analyzer")
+    print("OpenAI Tool Name:", openai_tool["function"]["name"])</code></pre>
+          </div>
+
+          <div class="code-pane" id="q-remote">
+            <pre><code>from capforge import CapForgeClient
+
+# Connect to a remote CapForge cluster or daemon
+client = CapForgeClient(
+    server_url="http://localhost:8000",
+    api_key="your-secure-capforge-api-key"
+)
+
+# Check cluster health (DB WAL, Sandbox driver, Redis broker)
+health = client.health_check()
+print("Cluster Health:", health)
+
+# Search existing capabilities via semantic vector store
+results = client.search("calculate portfolio risk under stress")
+for cap in results:
+    print(f"Found: {cap.id} ({cap.version}) - Status: {cap.status}")
+
+# Execute remotely via REST with automatic HMAC signature verification
+res = client.execute(
+    capability_id="sentiment_analyzer",
+    inputs={"text": "Real-time remote execution"}
+)
+print("Result:", res.output)</code></pre>
+          </div>
+
+          <div class="code-pane" id="q-cli">
+            <pre><code># 1. Install CapForge directly via pip
+pip install capforge
+
+# Or install latest release directly from GitHub:
+# pip install git+https://github.com/abhay-2108/CapForge.git
+
+# 2. Check system readiness & sandbox health
+capforge health
+
+# 3. Launch FastAPI REST server & Model Context Protocol (MCP) SSE hub
+capforge serve --port 8000
+
+# 4. Verify CLI version
+capforge version</code></pre>
+          </div>
+
+          <div class="code-pane" id="q-curl">
+            <pre><code># 1. Health check
+curl -s http://127.0.0.1:8000/health | jq
+
+# 2. Query active capabilities
+curl -s -H "Authorization: Bearer dev-secret-key"   http://127.0.0.1:8000/api/v1/capabilities | jq '.[0].id'
+
+# 3. Execute capability in isolated sandbox
+curl -s -X POST http://127.0.0.1:8000/api/v1/capabilities/sentiment_analyzer/execute   -H "Authorization: Bearer dev-secret-key"   -H "Content-Type: application/json"   -d '{"capability_id":"sentiment_analyzer","inputs":{"text":"Autonomous evolution works!"}}' | jq</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- INSTALL -->
+      <section class="doc-section" id="install">
+        <div class="eyebrow">Get Started</div>
+        <h2>Installation &amp; Prerequisites</h2>
+        <p>CapForge is distributed as a standard Python package. You can install it directly into any Python &ge; 3.10 virtual environment via <code class="inline">pip</code> without cloning the repository.</p>
+
+        <h4>1. Standard Installation (Recommended)</h4>
+        <div class="code-box">
+          <div class="code-header">
+            <div class="code-tabs">
+              <button class="code-tab-btn active" data-pane="pip-standard">PyPI Standard</button>
+              <button class="code-tab-btn" data-pane="pip-git">Direct from GitHub</button>
+              <button class="code-tab-btn" data-pane="pip-extras">With Optional Extras</button>
+            </div>
+            <span class="code-lang-tag">bash &bull; pip</span>
+          </div>
+
+          <div class="code-pane active" id="pip-standard">
+            <pre><code># Install CapForge core runtime
+pip install capforge
+
+# Verify installation and diagnostic health
+capforge health</code></pre>
+          </div>
+
+          <div class="code-pane" id="pip-git">
+            <pre><code># Install latest production release directly from GitHub
+pip install git+https://github.com/abhay-2108/CapForge.git
+
+# Verify CLI availability
+capforge --help</code></pre>
+          </div>
+
+          <div class="code-pane" id="pip-extras">
+            <pre><code># Install with formal SMT invariant verification (Z3 & SymPy)
+pip install "capforge[formal]"
+
+# Install with complete testing and verification suite
+pip install "capforge[all]"
+
+# Direct install from GitHub with all extras
+pip install "capforge[all] @ git+https://github.com/abhay-2108/CapForge.git"</code></pre>
+          </div>
+        </div>
+
+        <div class="callout success">
+          <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          <div class="callout-content">
+            <strong>Instant Verification</strong>
+            <p>After running <code class="inline">pip install capforge</code>, run <code class="inline">capforge health</code> to verify that SQLite WAL storage, sandbox containment (Docker/Subprocess), broker event bus, and runtime firewall are operational.</p>
+          </div>
+        </div>
+
+        <h4>2. System Requirements</h4>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Requirement</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Python Runtime</strong></td>
+                <td>&ge; 3.10 (3.11 recommended)</td>
+                <td>Compatible with CPython on Windows, macOS, and Linux x86_64/ARM64.</td>
+              </tr>
+              <tr>
+                <td><strong>Docker (Optional)</strong></td>
+                <td>Docker Engine &ge; 20.10</td>
+                <td>Recommended for Level 2 container isolation. Automatically falls back to secure subprocess isolation if absent.</td>
+              </tr>
+              <tr>
+                <td><strong>Theorem Provers (Optional)</strong></td>
+                <td><code>z3-solver</code>, <code>sympy</code></td>
+                <td>Used for Level 1 SMT formal contract proofs (installed via <code>pip install "capforge[formal]"</code>).</td>
+              </tr>
+              <tr>
+                <td><strong>Rust Toolchain (Optional)</strong></td>
+                <td><code>cargo</code>, <code>maturin</code></td>
+                <td>Required only if using the automated Python-to-Rust PyO3 transpilation engine.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h4>3. Contributing / Building from Source (Local Development Only)</h4>
+        <p class="muted">If you are contributing to CapForge or modifying core runtime primitives directly:</p>
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">bash &bull; source</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>git clone https://github.com/abhay-2108/CapForge.git
+cd CapForge
+python -m venv .venv
+# On Windows: .\.venv\Scripts\Activate.ps1 | On Linux/macOS: source .venv/bin/activate
+pip install -e ".[all]"
+pytest tests/ -q</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONFIG -->
+      <section class="doc-section" id="config">
+        <div class="eyebrow">Get Started</div>
+        <h2>Configuration Reference (<code class="inline">.env</code>)</h2>
+        <p>CapForge reads configuration from system environment variables or a local <code class="inline">.env</code> file. Copy <code class="inline">.env.example</code> to <code class="inline">.env</code>:</p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Default</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>CAPFORGE_LLM_PROVIDER</code></td>
+                <td><code>gemini</code></td>
+                <td>Model provider for synthesis: <code>gemini</code>, <code>openai</code>, <code>anthropic</code>, or <code>ollama</code>. (Falls back to deterministic AST templates if no key is set).</td>
+              </tr>
+              <tr>
+                <td><code>GEMINI_API_KEY</code> / <code>OPENAI_API_KEY</code></td>
+                <td><em>empty</em></td>
+                <td>API credentials for code synthesis and AST self-repair reflection.</td>
+              </tr>
+              <tr>
+                <td><code>CAPFORGE_DEV_MODE</code></td>
+                <td><code>false</code></td>
+                <td>When <code>true</code>, permits unauthenticated local requests. Must remain <code>false</code> in production environments.</td>
+              </tr>
+              <tr>
+                <td><code>CAPFORGE_SANDBOX_DRIVER</code></td>
+                <td><code>auto</code></td>
+                <td>Sandbox containment driver: <code>auto</code> (Docker when available, subprocess fallback), <code>docker</code>, or <code>wasm</code>.</td>
+              </tr>
+              <tr>
+                <td><code>CAPFORGE_DATABASE_URL</code></td>
+                <td><code>sqlite:///data/capforge.db</code></td>
+                <td>Registry database: SQLite WAL for single-node, or <code>postgresql://...</code> for multi-instance clusters.</td>
+              </tr>
+              <tr>
+                <td><code>CAPFORGE_REDIS_URL</code></td>
+                <td><em>empty</em></td>
+                <td>Redis connection string for distributed job queues and rate limits. If empty, uses in-memory broker.</td>
+              </tr>
+              <tr>
+                <td><code>CAPFORGE_WEBHOOK_SECRET</code></td>
+                <td><em>auto-generated</em></td>
+                <td>HMAC-SHA256 signing secret for outbound webhook events.</td>
+              </tr>
+              <tr>
+                <td><code>CAPFORGE_ENABLE_FORMAL_VERIFICATION</code></td>
+                <td><code>true</code></td>
+                <td>Enables SMT theorem proving via Z3 and SymPy during Level 1 verification.</td>
+              </tr>
+              <tr>
+                <td><code>CAPFORGE_ENABLE_RUST_TRANSPILER</code></td>
+                <td><code>true</code></td>
+                <td>Enables automatic Python-to-Rust PyO3 compilation for computational hot-paths.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ARCHITECTURE -->
+      <section class="doc-section" id="architecture">
+        <div class="eyebrow">Core Architecture</div>
+        <h2>Three-Plane Architecture</h2>
+        <p>CapForge strictly decouples low-latency deterministic execution from asynchronous, resource-capped learning and synthesis:</p>
+
+        <div class="arch-diagram">
+          <div class="arch-plane">
+            <div class="arch-plane-header">
+              <span class="arch-plane-title">Plane 1 &mdash; Execution Plane (Synchronous, Low-Latency)</span>
+              <span class="arch-plane-latency">&lt; 10 ms overhead</span>
+            </div>
+            <p>Serves production host agents (LangGraph, CrewAI, OpenAI Assistant, Cursor, Claude Desktop). Enforces runtime firewall security before delegating to isolated container sandboxes.</p>
+            <div class="arch-plane-grid">
+              <div class="arch-box">Host Agent Bridge</div>
+              <div class="arch-box">Capability Router</div>
+              <div class="arch-box">Runtime Firewall</div>
+              <div class="arch-box">Isolated Sandbox (Docker/Subprocess)</div>
+            </div>
+          </div>
+
+          <div class="arch-connector">
+            <span>&darr; Telemetry, spans, and novel execution failure patterns</span>
+          </div>
+
+          <div class="arch-plane">
+            <div class="arch-plane-header">
+              <span class="arch-plane-title">Plane 2 &mdash; Control Plane (Governance &amp; Trust Registry)</span>
+              <span class="arch-plane-latency">Event Gateway &amp; WAL</span>
+            </div>
+            <p>Maintains persistent state in SQLite WAL or PostgreSQL. Tracks SemVer versions, dependency DAGs, blast radius, cryptographic trust signatures, and SLA telemetry.</p>
+            <div class="arch-plane-grid">
+              <div class="arch-box">Capability Registry</div>
+              <div class="arch-box">HMAC / ED25519 Trust Chain</div>
+              <div class="arch-box">Dependency DAG &amp; Blast Radius</div>
+              <div class="arch-box">Runtime Profiler (SLA Monitor)</div>
+            </div>
+          </div>
+
+          <div class="arch-connector">
+            <span>&darr; Unresolved capability gaps and optimization triggers</span>
+          </div>
+
+          <div class="arch-plane">
+            <div class="arch-plane-header">
+              <span class="arch-plane-title">Plane 3 &mdash; Learning Plane (Asynchronous, Sandboxed)</span>
+              <span class="arch-plane-latency">Job Worker Pool</span>
+            </div>
+            <p>Asynchronously executes heavy code synthesis, 3-pass AST self-repair, 5-level verification battery, PyO3 Rust transpilation, and mutation testing with zero impact on live agents.</p>
+            <div class="arch-plane-grid">
+              <div class="arch-box">LLM Code Synthesizer</div>
+              <div class="arch-box">3-Pass AST AutoRepair</div>
+              <div class="arch-box">5-Level Verification Pipeline</div>
+              <div class="arch-box">PyO3 Rust Transpiler</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout warning">
+          <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div class="callout-content">
+            <strong>Security Invariant: Execution vs Learning Isolation</strong>
+            <p>Production execution runs deterministic, read-mostly, and protected by the Capability Firewall. The Learning Plane operates in an unprivileged, isolated sandbox with zero access to production database credentials or host file access.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ONTOLOGY -->
+      <section class="doc-section" id="ontology">
+        <div class="eyebrow">Core Architecture</div>
+        <h2>Capability Ontology &amp; Manifest</h2>
+        <p>In CapForge, a <strong>Capability</strong> is a formal, self-contained unit of machine-executable intelligence with typed parameter contracts, risk bounds, and embedded verification suites.</p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Capability Type</th>
+                <th>Execution Behavior</th>
+                <th>Example Use Case</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>TOOL</code></td>
+                <td>Stateless atomic function with input/output schemas</td>
+                <td>Currency conversion, JSON parsing, regex redaction</td>
+              </tr>
+              <tr>
+                <td><code>SKILL</code></td>
+                <td>Domain task solver with multi-step internal logic &amp; tests</td>
+                <td>Monte Carlo VaR, PDF table extractor, SQL optimizer</td>
+              </tr>
+              <tr>
+                <td><code>WORKFLOW</code></td>
+                <td>Stateful DAG composing multiple capabilities</td>
+                <td>ETL ingestion pipeline, multi-agent research synthesis</td>
+              </tr>
+              <tr>
+                <td><code>COMPOSITION</code></td>
+                <td>Pipelined or parallel chaining of capabilities</td>
+                <td>Data scraper &rarr; schema normalizer &rarr; vector embedder</td>
+              </tr>
+              <tr>
+                <td><code>EVALUATOR</code></td>
+                <td>Judge model asserting correctness and SLAs</td>
+                <td>LLM-as-a-judge rubric, hallucination detector</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">yaml &bull; manifest.yaml</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>schema_version: "1.0.0"
+capability:
+  id: "monte_carlo_var"
+  version: "1.0.0"
+  namespace: "finance"
+  capability_type: "SKILL"
+  status: "ACTIVE"
+  risk_level: "MEDIUM"
+  entrypoint_function: "compute_var"
+  inputs:
+    portfolio_value:
+      name: "portfolio_value"
+      type: "number"
+      required: true
+      description: "Total portfolio dollar balance"
+    confidence:
+      name: "confidence"
+      type: "number"
+      required: false
+      default: 0.95
+      description: "Confidence interval (e.g. 0.95, 0.99)"
+  outputs:
+    var_amount:
+      name: "var_amount"
+      type: "number"
+      description: "Maximum expected loss within horizon"
+  verification_tests:
+    - id: "t1"
+      inputs: { portfolio_value: 1000000, confidence: 0.95, simulations: 10000 }
+      expected_keys: ["var_amount", "cvar"]
+      assert_expression: "output['var_amount'] > 0 and output['cvar'] >= output['var_amount']"
+  trust_chain:
+    signature: "hmac-sha256:7f8a12e399c0d18b..."
+    signed_by: "capforge-control-plane"
+    timestamp: "2026-10-04T02:00:00Z"</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- VERIFICATION -->
+      <section class="doc-section" id="verification">
+        <div class="eyebrow">Core Architecture</div>
+        <h2>5-Level Verification Pipeline</h2>
+        <p>No synthesized or updated capability enters production without passing all 5 levels of the CapForge verification battery:</p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Level</th>
+                <th>Gate Name</th>
+                <th>Verification Objective &amp; Mechanism</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>L0</strong></td>
+                <td>CodeGuardian Security AST</td>
+                <td>Static AST analysis prohibiting dangerous builtins (<code>exec</code>, <code>eval</code>, <code>os.system</code>), private network scanning, and unvetted imports.</td>
+              </tr>
+              <tr>
+                <td><strong>L1</strong></td>
+                <td>Structural &amp; SMT Invariants</td>
+                <td>Schema type conformance + Z3 / SymPy theorem proving for recursion termination, monotonicity, and output domain non-negativity.</td>
+              </tr>
+              <tr>
+                <td><strong>L2</strong></td>
+                <td>Functional Isolated Sandbox</td>
+                <td>Executes capability inside an unprivileged Docker container or subprocess sandbox with strict CPU, memory, and timeout bounds.</td>
+              </tr>
+              <tr>
+                <td><strong>L3</strong></td>
+                <td>Property Fuzzing &amp; Generalization</td>
+                <td>Generates 50+ randomized boundary inputs (empty lists, negative numbers, extreme values) to prove robustness against unexpected inputs.</td>
+              </tr>
+              <tr>
+                <td><strong>L4</strong></td>
+                <td>Zero-Regression Battery</td>
+                <td>Runs historical verification test suites across all prior versions to guarantee backward compatibility before promotion.</td>
+              </tr>
+              <tr>
+                <td><strong>L5</strong></td>
+                <td>Continuous Mutation Testing</td>
+                <td>Injects deliberate AST mutations (comparison flips, boundary shifts) to ensure test suites kill > 80% of mutants.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- REPAIR -->
+      <section class="doc-section" id="repair">
+        <div class="eyebrow">Core Architecture</div>
+        <h2>Closed-Loop Self-Repair Engine</h2>
+        <p>When code synthesis fails during verification, CapForge activates a 3-pass automated repair loop without human intervention:</p>
+
+        <div class="feature-grid">
+          <div class="feature-card">
+            <h4>Pass 1: AST Heuristic Fixes</h4>
+            <p>Deterministic regex and AST rewriting for missing imports, syntax errors, and indentation inconsistencies. Executed in &lt; 5 ms.</p>
+          </div>
+          <div class="feature-card">
+            <h4>Pass 2: LLM Reflection</h4>
+            <p>Feeds compiler tracebacks, sandbox execution errors, and failed assertion logs back to the LLM for targeted code regeneration.</p>
+          </div>
+          <div class="feature-card">
+            <h4>Pass 3: Schema Coercion</h4>
+            <p>Analyzes input/output mismatches against ParameterSpec and applies automatic type-casting and dictionary key normalization.</p>
+          </div>
+        </div>
+
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python &bull; auto-repair engine</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>from capforge.verification.repair import ClosedLoopRepairEngine
+
+# Initialize the 3-pass self-healing engine
+repair_engine = ClosedLoopRepairEngine(max_attempts=3)
+
+# If sandbox evaluation fails:
+repaired_capability, repair_report = repair_engine.repair(
+    capability=failed_cap,
+    eval_result=eval_result,
+    context={"task_description": "Compute portfolio VaR"}
+)
+
+if repair_report.success:
+    print(f"Self-Repair Succeeded via {repair_report.pass_name}!")
+    print(f"Attempts used: {repair_report.attempts}")
+else:
+    print("Repair exhausted. Flagged for human review ticket.")</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- TRUST CHAIN -->
+      <section class="doc-section" id="trust-chain">
+        <div class="eyebrow">Core Architecture</div>
+        <h2>Trust Chain &amp; Cryptographic Security</h2>
+        <p>To prevent capability poisoning and supply-chain attacks, every capability in CapForge is cryptographically signed upon passing verification:</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>from capforge.security.trust_chain import TrustChain
+
+trust = TrustChain(secret_key="enterprise-signing-key")
+
+# Sign a verified capability manifest
+signature = trust.sign_capability(capability)
+print("HMAC-SHA256 Signature:", signature)
+
+# Verify tamper-evidence before execution
+is_valid = trust.verify_capability(capability, signature)
+assert is_valid, "Tamper detected: Capability code body was modified outside Control Plane!"</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- SDK -->
+      <section class="doc-section" id="sdk">
+        <div class="eyebrow">Developer Guides</div>
+        <h2>Python SDK Client &amp; Decorator</h2>
+        <p>The <code class="inline">capforge</code> Python SDK is the primary developer interface, supporting both embedded in-memory mode and remote client-server connections:</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <div class="code-tabs">
+              <button class="code-tab-btn active" data-pane="sdk-local">Local Embedded Client</button>
+              <button class="code-tab-btn" data-pane="sdk-batch">Batch Execution</button>
+              <button class="code-tab-btn" data-pane="sdk-search">Semantic Discovery</button>
+            </div>
+            <span class="code-lang-tag">python</span>
+          </div>
+
+          <div class="code-pane active" id="sdk-local">
+            <pre><code>from capforge import CapForgeClient, capability
+
+@capability(
+    id="text_summarizer",
+    domain="nlp",
+    risk_level="LOW",
+    tests=[{"id": "t1", "inputs": {"text": "A long document..."}, "expected_keys": ["summary"]}]
+)
+def summarize(text: str) -> dict:
+    return {"summary": text[:60] + "..."}
+
+with CapForgeClient() as client:
+    # Register and automatically promote
+    client.register(summarize, promote=True)
+
+    # Execute
+    res = client.execute("text_summarizer", {"text": "CapForge autonomously evolves capabilities."})
+    print(res.output)</code></pre>
+          </div>
+
+          <div class="code-pane" id="sdk-batch">
+            <pre><code># Execute multiple capability calls concurrently with rate-limiting & telemetry
+requests = [
+    {"capability_id": "text_summarizer", "inputs": {"text": "Document A"}},
+    {"capability_id": "text_summarizer", "inputs": {"text": "Document B"}},
+    {"capability_id": "text_summarizer", "inputs": {"text": "Document C"}}
+]
+
+with CapForgeClient() as client:
+    results = client.batch_execute(requests, max_concurrency=5)
+    for res in results:
+        print(f"Status: {res.status} | Latency: {res.latency_ms:.2f}ms")</code></pre>
+          </div>
+
+          <div class="code-pane" id="sdk-search">
+            <pre><code>with CapForgeClient() as client:
+    # Hybrid BM25 + Vector semantic capability search
+    matches = client.search(
+        query="Monte Carlo simulation for portfolio risk",
+        domain="finance",
+        top_k=3
+    )
+
+    for cap in matches:
+        print(f"Match: {cap.id} (v{cap.version}) - Status: {cap.status}")</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- LANGGRAPH -->
+      <section class="doc-section" id="langgraph">
+        <div class="eyebrow">Developer Guides</div>
+        <h2>LangGraph Integration</h2>
+        <p>Integrate CapForge capabilities directly into LangGraph <code class="inline">StateGraph</code> nodes with autonomous fallback for capability gaps:</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python &bull; langgraph adapter</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>from typing import TypedDict
+from langgraph.graph import StateGraph, END
+from capforge import CapForgeClient
+from capforge.runtime.agent_adapter import LangGraphAdapter
+
+class AgentState(TypedDict):
+    task: str
+    tool_inputs: dict
+    result: dict
+
+client = CapForgeClient()
+adapter = LangGraphAdapter(client)
+
+# Create a dynamic CapForge execution node
+tool_node = adapter.create_langgraph_node("monte_carlo_var")
+
+# Create autonomous evolution fallback node (synthesizes new capabilities on demand)
+evolution_node = adapter.create_evolution_node()
+
+workflow = StateGraph(AgentState)
+workflow.add_node("execute_tool", tool_node)
+workflow.add_node("evolve_capability", evolution_node)
+
+# Route to evolution node if capability is missing
+workflow.set_entry_point("execute_tool")
+workflow.add_conditional_edges(
+    "execute_tool",
+    lambda state: "evolve_capability" if state.get("error") == "CAPABILITY_NOT_FOUND" else END
+)
+workflow.add_edge("evolve_capability", "execute_tool")
+
+app = workflow.compile()</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- CREWAI -->
+      <section class="doc-section" id="crewai">
+        <div class="eyebrow">Developer Guides</div>
+        <h2>CrewAI Integration</h2>
+        <p>Equip CrewAI agents with CapForge tools dynamically:</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python &bull; crewai</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>from crewai import Agent, Task, Crew
+from capforge import CapForgeClient
+
+with CapForgeClient() as client:
+    # Convert any CapForge capability into a native CrewAI tool
+    var_tool = client.to_crewai_tool("monte_carlo_var")
+
+    risk_officer = Agent(
+        role="Chief Risk Officer",
+        goal="Calculate portfolio Value-at-Risk under market stress",
+        backstory="Quantitative analyst utilizing formal verification tools",
+        tools=[var_tool],
+        verbose=True
+    )
+
+    task = Task(
+        description="Compute 99% VaR for a $5M portfolio under high volatility",
+        expected_output="Detailed dollar VaR and CVaR loss thresholds",
+        agent=risk_officer
+    )
+
+    crew = Crew(agents=[risk_officer], tasks=[task])
+    crew.kickoff()</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- OPENAI -->
+      <section class="doc-section" id="openai">
+        <div class="eyebrow">Developer Guides</div>
+        <h2>OpenAI &amp; Anthropic Tool Calling</h2>
+        <p>Export formal JSON Schemas directly to OpenAI Assistants and Anthropic Claude:</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python &bull; openai function calling</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>from openai import OpenAI
+from capforge import CapForgeClient
+
+cap_client = CapForgeClient()
+openai_client = OpenAI()
+
+# Export all active capabilities as OpenAI tools
+tools = [cap_client.to_openai_tool("sentiment_analyzer")]
+
+response = openai_client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Analyze sentiment: 'CapForge is incredible!'"}],
+    tools=tools,
+    tool_choice="auto"
+)
+
+# Execute chosen tool safely inside CapForge sandbox
+tool_call = response.choices[0].message.tool_calls[0]
+execution_res = cap_client.handle_openai_tool_call(tool_call)
+print("Execution Result:", execution_res)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- MCP -->
+      <section class="doc-section" id="mcp">
+        <div class="eyebrow">Developer Guides</div>
+        <h2>Model Context Protocol (MCP Server)</h2>
+        <p>CapForge features a native bi-directional Model Context Protocol (MCP) server supporting both <strong>STDIO</strong> and <strong>Server-Sent Events (SSE)</strong> transports. Every registered capability is dynamically exposed as a typed MCP tool.</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <div class="code-tabs">
+              <button class="code-tab-btn active" data-pane="mcp-claude">Claude Desktop Config</button>
+              <button class="code-tab-btn" data-pane="mcp-cursor">Cursor IDE Config</button>
+              <button class="code-tab-btn" data-pane="mcp-cli">Launch MCP CLI</button>
+            </div>
+            <span class="code-lang-tag">json &bull; claude_desktop_config.json</span>
+          </div>
+
+          <div class="code-pane active" id="mcp-claude">
+            <pre><code>{
+  "mcpServers": {
+    "capforge": {
+      "command": "python",
+      "args": ["-m", "capforge.mcp.server"],
+      "env": {
+        "CAPFORGE_DATABASE_URL": "sqlite:///P:/Agentic Projects/CapForge/data/capforge.db",
+        "CAPFORGE_SANDBOX_DRIVER": "auto"
+      }
+    }
+  }
+}</code></pre>
+          </div>
+
+          <div class="code-pane" id="mcp-cursor">
+            <pre><code>{
+  "mcpServers": {
+    "capforge-sse": {
+      "url": "http://localhost:8000/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer dev-secret-key"
+      }
+    }
+  }
+}</code></pre>
+          </div>
+
+          <div class="code-pane" id="mcp-cli">
+            <pre><code># Run CapForge MCP STDIO server
+python -m capforge.mcp.server
+
+# Or serve over SSE alongside FastAPI REST endpoints:
+capforge serve --port 8000
+# Connect to SSE endpoint: http://localhost:8000/mcp/sse</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- WEBHOOKS -->
+      <section class="doc-section" id="webhooks">
+        <div class="eyebrow">Developer Guides</div>
+        <h2>Webhooks &amp; Real-Time SSE Streams</h2>
+        <p>Subscribe to capability lifecycle events (<code class="inline">CAPABILITY_ACQUIRED</code>, <code class="inline">VERIFICATION_PASSED</code>, <code class="inline">OPTIMIZATION_GAP</code>, <code class="inline">QUARANTINED</code>) with HMAC-SHA256 signature verification and SSRF protection:</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>with CapForgeClient() as client:
+    # Subscribe an external webhook endpoint to evolution events
+    subscription = client.subscribe_webhook(
+        url="https://api.yourcompany.com/webhooks/capforge",
+        events=["CAPABILITY_PROMOTED", "OPTIMIZATION_GAP"],
+        secret="shared-hmac-secret"
+    )
+    print("Webhook Subscribed:", subscription.id)</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- PROFILER -->
+      <section class="doc-section" id="profiler">
+        <div class="eyebrow">Optimization &amp; Advanced</div>
+        <h2>Runtime Profiling &amp; SLA Bottleneck Detection</h2>
+        <p>CapForge continuously monitors latency histograms ($P_{50}$, $P_{95}$, $P_{99}$) and resource churn. When a capability violates its SLA budget, the profiler flags an <code class="inline">OPTIMIZATION_GAP</code> to trigger autonomous compilation.</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python &bull; capforge.optimization.profiler</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>from capforge.optimization.profiler import RuntimeProfiler
+
+profiler = RuntimeProfiler(target_p95_ms=25.0)
+
+# Record telemetry samples from live execution
+for sample in latency_samples:
+    profiler.record_execution(
+        capability_id="monte_carlo_var",
+        version="1.0.0",
+        duration_ms=sample
+    )
+
+# Check for SLA violations
+gap = profiler.check_optimization_gap("monte_carlo_var", "1.0.0")
+if gap:
+    print(f"Optimization Gap Detected: {gap.reason}")
+    print(f"P95 Latency: {gap.p95_latency_ms:.2f}ms (Target: {gap.target_p95_ms:.2f}ms)")
+    print(f"Recommended Action: {gap.suggested_action}")  # 'JIT_COMPILE_RUST_C'</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- TRANSPILER -->
+      <section class="doc-section" id="transpiler">
+        <div class="eyebrow">Optimization &amp; Advanced</div>
+        <h2>Python-to-Rust PyO3 Transpiler</h2>
+        <p>For computational hot-paths (Monte Carlo simulations, parser loops, math transformations), CapForge autonomously transpiles Python into native Rust PyO3 modules, achieving <strong>20x&ndash;100x throughput gains</strong> without developer intervention:</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <div class="code-tabs">
+              <button class="code-tab-btn active" data-pane="rust-py">Python Original</button>
+              <button class="code-tab-btn" data-pane="rust-rs">Transpiled PyO3 Rust Kernel</button>
+            </div>
+            <span class="code-lang-tag">python</span>
+          </div>
+
+          <div class="code-pane active" id="rust-py">
+            <pre><code># Original Python computational hot-path (Latency: 18.4 ms)
+def compute_var(portfolio_value: float, confidence: float, simulations: int) -> dict:
+    losses = []
+    for _ in range(simulations):
+        ret = random.gauss(0.0005, 0.015)
+        losses.append(-portfolio_value * ret)
+    losses.sort()
+    idx = int(confidence * simulations)
+    return {"var_amount": losses[idx]}</code></pre>
+          </div>
+
+          <div class="code-pane" id="rust-rs">
+            <pre><code>// Auto-Transpiled PyO3 Rust Module (Latency: 0.38 ms &bull; 48.4x Speedup)
+use pyo3::prelude::*;
+use rand_distr::{Normal, Distribution};
+
+#[pyfunction]
+pub fn fast_monte_carlo_var(val: f64, conf: f64, sims: usize) -> PyResult<f64> {
+    let mut rng = rand::thread_rng();
+    let norm = Normal::new(0.0005, 0.015).unwrap();
+    let mut losses: Vec<f64> = (0..sims).map(|_| -val * norm.sample(&mut rng)).collect();
+    losses.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let idx = ((conf * sims as f64) as usize).min(sims - 1);
+    Ok(losses[idx])
+}</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- FORMAL -->
+      <section class="doc-section" id="formal">
+        <div class="eyebrow">Optimization &amp; Advanced</div>
+        <h2>SMT Formal Verification (Z3 &amp; SymPy)</h2>
+        <p>Beyond sample-based unit testing, CapForge incorporates SMT theorem proving into Level 1 verification:</p>
+        <ul>
+          <li><strong>Recursion Bounds:</strong> Statically proves absence of unbounded recursion.</li>
+          <li><strong>Output Non-Negativity:</strong> Mathematically proves that risk metrics (VaR, variances) are strictly non-negative.</li>
+          <li><strong>Monotonicity:</strong> Proves that as confidence increases ($c_1 \le c_2$), risk $VaR(c_1) \le VaR(c_2)$.</li>
+          <li><strong>Termination Proofs:</strong> Statically verifies loop termination bounds.</li>
+        </ul>
+      </section>
+
+      <!-- MUTATION -->
+      <section class="doc-section" id="mutation">
+        <div class="eyebrow">Optimization &amp; Advanced</div>
+        <h2>Continuous Mutation Testing</h2>
+        <p>CapForge introduces adversarial mutation testing to continuously harden test suites. The mutation engine injects AST operators (comparison flips, arithmetic mutations) and generates synthetic test cases until the <strong>mutation kill score exceeds 80%</strong>.</p>
+      </section>
+
+      <!-- SIMULATOR -->
+      <section class="doc-section" id="simulator">
+        <div class="eyebrow">Interactive Lab</div>
+        <h2>Live Capability Evolution &amp; Synthesis Simulator</h2>
+        <p>Experience CapForge's autonomous evolution loop live. Select a capability scenario, click <strong>"Synthesize &amp; Run Evolution Pipeline"</strong>, and watch the multi-stage pipeline execute with live telemetry:</p>
+
+        <div class="simulator-panel">
+          <div class="simulator-header">
+            <div class="simulator-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              <span>CapForge Autonomous Evolution Laboratory</span>
+            </div>
+            <span class="status-pill"><span class="pulse-dot"></span> Interactive Simulator</span>
+          </div>
+
+          <div class="simulator-controls">
+            <select class="sim-select" id="simSelect" aria-label="Select capability scenario">
+              <option value="monte_carlo_var">Scenario 1: Monte Carlo Value-at-Risk Simulator (Finance &bull; Hot-Path Rust)</option>
+              <option value="csv_sanitizer">Scenario 2: PII Data Redactor &amp; Schema Sanitizer (Security &bull; Privacy Guard)</option>
+              <option value="sql_optimizer">Scenario 3: SQL Dialect Transpiler &amp; Injection Guard (Database &bull; AST Firewall)</option>
+            </select>
+            <button class="sim-run-btn" id="simRunBtn">Synthesize &amp; Run Evolution Pipeline</button>
+          </div>
+
+          <div class="sim-pipeline-stages">
+            <div class="sim-stage" id="stage1">
+              <div class="sim-stage-num">Stage 1</div>
+              <div class="sim-stage-name">Gap Analysis</div>
+            </div>
+            <div class="sim-stage" id="stage2">
+              <div class="sim-stage-num">Stage 2</div>
+              <div class="sim-stage-name">AST Synthesis</div>
+            </div>
+            <div class="sim-stage" id="stage3">
+              <div class="sim-stage-num">Stage 3</div>
+              <div class="sim-stage-name">5-Level Gate</div>
+            </div>
+            <div class="sim-stage" id="stage4">
+              <div class="sim-stage-num">Stage 4</div>
+              <div class="sim-stage-name">Rust JIT</div>
+            </div>
+            <div class="sim-stage" id="stage5">
+              <div class="sim-stage-num">Stage 5</div>
+              <div class="sim-stage-name">Trust Signed</div>
+            </div>
+          </div>
+
+          <div class="sim-body">
+            <pre class="sim-editor" id="simEditor"><code>// Loading capability blueprint...</code></pre>
+            <pre class="sim-results" id="simResults"><code>// Output and telemetry will appear here...</code></pre>
+          </div>
+
+          <div class="sim-footer">
+            <span id="simStatus">Ready to evolve</span>
+            <span>Latency: <strong id="simLatency">0.00 ms</strong></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- REST API -->
+      <section class="doc-section" id="rest">
+        <div class="eyebrow">Operations &amp; Reference</div>
+        <h2>REST API Reference</h2>
+        <p>CapForge provides an OpenAPI-compliant REST API served at <code class="inline">http://localhost:8000</code> with interactive Swagger documentation at <code class="inline">/docs</code>:</p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Method</th>
+                <th>Endpoint</th>
+                <th>Auth Role</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="method-tag get">GET</span></td>
+                <td><code>/health</code></td>
+                <td>Public</td>
+                <td>Cluster readiness, sandbox driver health, and storage backend status</td>
+              </tr>
+              <tr>
+                <td><span class="method-tag get">GET</span></td>
+                <td><code>/api/v1/capabilities</code></td>
+                <td>Reader / User</td>
+                <td>List registered capabilities with status and tags filtering</td>
+              </tr>
+              <tr>
+                <td><span class="method-tag post">POST</span></td>
+                <td><code>/api/v1/capabilities</code></td>
+                <td>Writer / Admin</td>
+                <td>Register a new capability manifest with automated verification gate</td>
+              </tr>
+              <tr>
+                <td><span class="method-tag post">POST</span></td>
+                <td><code>/api/v1/capabilities/{id}/execute</code></td>
+                <td>User / Operator</td>
+                <td>Execute a capability in the sandbox with parameter enforcement</td>
+              </tr>
+              <tr>
+                <td><span class="method-tag post">POST</span></td>
+                <td><code>/api/v1/capabilities/{id}/optimize</code></td>
+                <td>Admin</td>
+                <td>Trigger hot-path profiling and autonomous Rust PyO3 transpilation</td>
+              </tr>
+              <tr>
+                <td><span class="method-tag post">POST</span></td>
+                <td><code>/api/v1/capabilities/{id}/mutate</code></td>
+                <td>Admin</td>
+                <td>Run continuous mutation testing and generate edge-case test suites</td>
+              </tr>
+              <tr>
+                <td><span class="method-tag get">GET</span></td>
+                <td><code>/mcp/sse</code></td>
+                <td>User / MCP</td>
+                <td>Model Context Protocol (MCP) Server-Sent Events stream</td>
+              </tr>
+              <tr>
+                <td><span class="method-tag get">GET</span></td>
+                <td><code>/metrics</code></td>
+                <td>Monitoring</td>
+                <td>Prometheus metrics collector (execution latency, sandbox churn, memory)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CLI -->
+      <section class="doc-section" id="cli">
+        <div class="eyebrow">Operations &amp; Reference</div>
+        <h2>CLI Command Cheatsheet</h2>
+        <p>The <code class="inline">capforge</code> command-line utility provides rapid operator management:</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">bash &bull; cli commands</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code># Check system readiness, database WAL, and sandbox drivers
+capforge health
+
+# Run the 4-step autonomous killer demo
+capforge demo
+
+# Start the FastAPI REST server & MCP SSE hub
+capforge serve --host 0.0.0.0 --port 8000
+
+# Synthesize a capability from natural language specification
+capforge synth "Calculate 99% portfolio Value-at-Risk using Monte Carlo" --domain finance
+
+# Run 5-level verification battery against a capability
+capforge verify monte_carlo_var
+
+# Profile capability latency and compile PyO3 Rust extension
+capforge optimize monte_carlo_var --compile-rust
+
+# Launch Model Context Protocol (MCP) STDIO server
+capforge mcp
+
+# Audit security logs and trust signatures
+capforge audit --strict</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- DEPLOY -->
+      <section class="doc-section" id="deploy">
+        <div class="eyebrow">Operations &amp; Reference</div>
+        <h2>Enterprise Storage &amp; Docker Deployment</h2>
+        <p>CapForge supports enterprise production deployments with PostgreSQL distributed registries, S3/MinIO artifact storage, and Redis event streaming:</p>
+
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">yaml &bull; docker-compose.prod.yml</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>version: "3.9"
+
+services:
+  capforge-server:
+    image: capforge:v1.2.0
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - CAPFORGE_DEV_MODE=false
+      - CAPFORGE_DATABASE_URL=postgresql://capforge:secret@postgres:5432/capforge_prod
+      - CAPFORGE_REDIS_URL=redis://redis:6379/0
+      - CAPFORGE_SANDBOX_DRIVER=docker
+      - CAPFORGE_S3_BUCKET=capforge-artifacts
+      - CAPFORGE_S3_ENDPOINT=http://minio:9000
+    depends_on:
+      - postgres
+      - redis
+      - minio
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: capforge_prod
+      POSTGRES_USER: capforge
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+
+volumes:
+  pgdata:</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- TELEMETRY -->
+      <section class="doc-section" id="telemetry">
+        <div class="eyebrow">Operations &amp; Reference</div>
+        <h2>Telemetry &amp; OpenTelemetry Tracing</h2>
+        <p>CapForge natively instruments all capability executions, gap discoveries, and verification runs using OpenTelemetry GenAI semantic conventions:</p>
+        <ul>
+          <li><strong>Hierarchical Spans:</strong> <code class="inline">capforge.execute</code> &rarr; <code class="inline">capforge.firewall_check</code> &rarr; <code class="inline">capforge.sandbox_run</code>.</li>
+          <li><strong>Prometheus Metrics:</strong> <code class="inline">capforge_execution_duration_seconds</code>, <code class="inline">capforge_verification_passes_total</code>, <code class="inline">capforge_mutants_killed_ratio</code>.</li>
+        </ul>
+      </section>
+
+      <!-- SECURITY -->
+      <section class="doc-section" id="security">
+        <div class="eyebrow">Operations &amp; Reference</div>
+        <h2>Security &amp; Governance Runbook</h2>
+        <p>CapForge implements defense-in-depth across the entire capability lifecycle:</p>
+        <ul>
+          <li><strong>CodeGuardian AST Firewall:</strong> Blocks forbidden AST nodes, dynamic code evaluation, socket creation, and unauthorized disk writes.</li>
+          <li><strong>SSRF Guard:</strong> Prevents DNS rebinding and denies requests to RFC 1918 private IP ranges, loopback interfaces, and cloud metadata endpoints (169.254.169.254).</li>
+          <li><strong>RBAC Roles:</strong> Strict role separation (<code class="inline">reader</code>, <code class="inline">user</code>, <code class="inline">operator</code>, <code class="inline">admin</code>) enforced on every sensitive API surface.</li>
+          <li><strong>Audit Trail:</strong> Append-only, tamper-evident audit logging for all capability registrations, promotions, and rollbacks.</li>
+        </ul>
+      </section>
+
+      <!-- FAQ -->
+      <section class="doc-section" id="faq">
+        <div class="eyebrow">Operations &amp; Reference</div>
+        <h2>Troubleshooting &amp; FAQ</h2>
+        <div class="callout tip">
+          <div class="callout-content">
+            <strong>What happens if no LLM API key is configured?</strong>
+            <p>CapForge automatically falls back to deterministic AST templates and rule-based synthesis, allowing complete offline development and testing.</p>
+          </div>
+        </div>
+        <div class="callout tip">
+          <div class="callout-content">
+            <strong>Can CapForge run without Docker installed?</strong>
+            <p>Yes. When <code class="inline">CAPFORGE_SANDBOX_DRIVER=auto</code>, CapForge verifies Docker availability. If Docker is unavailable, it seamlessly falls back to secure subprocess isolation with resource constraints.</p>
+          </div>
+        </div>
+        <div class="callout tip">
+          <div class="callout-content">
+            <strong>How does CapForge prevent regressions during upgrades?</strong>
+            <p>Level 4 verification runs the complete historical regression test suite against any proposed version upgrade. If even a single test fails, the upgrade is blocked and automatically rolled back.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="docs-footer">
+        <div>&copy; 2026 CapForge &bull; Apache-2.0 Open Source</div>
+        <div>Engineered for Autonomous, Self-Healing AI Systems</div>
+      </footer>
+    </main>
+
+    <!-- Right Table of Contents (TOC) -->
+    <aside class="toc-sidebar" aria-label="Table of contents">
+      <div class="toc-title">On this page</div>
+      <ul class="toc-list">
+        <li><a class="toc-link" href="#overview">Overview &amp; Mission</a></li>
+        <li><a class="toc-link" href="#quickstart">5-Min Quickstart</a></li>
+        <li><a class="toc-link" href="#install">Installation</a></li>
+        <li><a class="toc-link" href="#config">Configuration (.env)</a></li>
+        <li><a class="toc-link" href="#architecture">Three-Plane Architecture</a></li>
+        <li><a class="toc-link" href="#ontology">Capability Ontology</a></li>
+        <li><a class="toc-link" href="#verification">5-Level Verification</a></li>
+        <li><a class="toc-link" href="#repair">Closed-Loop Self-Repair</a></li>
+        <li><a class="toc-link" href="#trust-chain">Trust Chain &amp; Security</a></li>
+        <li><a class="toc-link" href="#sdk">Python SDK Client</a></li>
+        <li><a class="toc-link" href="#langgraph">LangGraph Integration</a></li>
+        <li><a class="toc-link" href="#crewai">CrewAI Integration</a></li>
+        <li><a class="toc-link" href="#openai">OpenAI &amp; Anthropic</a></li>
+        <li><a class="toc-link" href="#mcp">MCP Server (STDIO &amp; SSE)</a></li>
+        <li><a class="toc-link" href="#webhooks">Webhooks &amp; Events</a></li>
+        <li><a class="toc-link" href="#profiler">Runtime Profiling &amp; SLA</a></li>
+        <li><a class="toc-link" href="#transpiler">Python-to-Rust PyO3</a></li>
+        <li><a class="toc-link" href="#formal">SMT Formal Verification</a></li>
+        <li><a class="toc-link" href="#mutation">Continuous Mutation Testing</a></li>
+        <li><a class="toc-link" href="#simulator">Capability Simulator</a></li>
+        <li><a class="toc-link" href="#rest">REST API Reference</a></li>
+        <li><a class="toc-link" href="#cli">CLI Reference</a></li>
+        <li><a class="toc-link" href="#deploy">Deploy &amp; Docker</a></li>
+        <li><a class="toc-link" href="#telemetry">Telemetry &amp; OTel</a></li>
+        <li><a class="toc-link" href="#security">Security &amp; Governance</a></li>
+        <li><a class="toc-link" href="#faq">Troubleshooting &amp; FAQ</a></li>
+      </ul>
+
+      <div class="toc-actions">
+
+        <a class="toc-action-link" href="https://github.com/abhay-2108/CapForge" target="_blank" rel="noopener">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span>Ask Question on GitHub</span>
+        </a>
+        <a class="toc-action-link" href="#overview">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+          <span>Back to Top</span>
+        </a>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Search Modal Dialog (Ctrl+K) -->
+  <div class="modal-overlay" id="searchModal" role="dialog" aria-modal="true" aria-label="Search documentation">
+    <div class="modal-dialog">
+      <div class="modal-input-wrap">
+        <svg class="modal-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="modal-input" id="searchInput" placeholder="Search documentation, APIs, and guides..." autocomplete="off">
+      </div>
+      <div class="modal-results" id="searchResults">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+      <div class="modal-footer">
+        <span>Navigation: <kbd>&uarr;</kbd> <kbd>&darr;</kbd> Select &bull; <kbd>Enter</kbd> Open &bull; <kbd>Esc</kbd> Close</span>
+        <span>CapForge Docs Search</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from capforge.verification.benchmark import (
     BenchmarkRegistry,
     BenchmarkRunner,

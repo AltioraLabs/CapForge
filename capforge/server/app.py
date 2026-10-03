@@ -7,12 +7,13 @@ governance, learning jobs, manifest import/export, and capability graph queries.
 
 from __future__ import annotations
 
+import json
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Query
+from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, Field
@@ -70,10 +71,10 @@ from capforge.runtime.pipeline import (
     PipelineExecutionResponse,
 )
 from capforge.security.privacy_filter import privacy_filter
+from capforge.server import auth
 from capforge.server.auth import (
     APIKeyRecord,
     UserRole,
-    auth_manager,
     require_roles,
 )
 from capforge.verification.benchmark import BenchmarkSuite, benchmark_registry
@@ -102,11 +103,56 @@ async def lifespan(app: FastAPI):
     logger.info("CapForge API shutting down.")
 
 
+# Paths that never require authentication (health probes; docs UI only in dev).
+_ALWAYS_PUBLIC_PATHS = {"/", "/health", "/health/ready"}
+
+
+async def enforce_auth(request: Request) -> APIKeyRecord | None:
+    """Global authentication gate: every route requires a valid API key,
+    except health probes (and API docs in dev mode).
+
+    In dev mode (CAPFORGE_DEV_MODE=true) missing keys fall back to root admin,
+    preserving the historical open behavior for local development and tests.
+    In production (dev mode off) unauthenticated requests get 401.
+    """
+    path = request.url.path
+    if path in _ALWAYS_PUBLIC_PATHS:
+        return None
+    if path.startswith(("/docs", "/redoc", "/openapi")):
+        # Single source of truth is the settings singleton (tests monkeypatch
+        # it; the env var is only read once at import). No live os.environ
+        # re-read here — it would make auth behavior untestable and racy.
+        if settings.dev_mode:
+            return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API documentation is disabled in production.",
+        )
+    api_key = request.headers.get("X-CapForge-Key")
+    if not api_key:
+        if settings.dev_mode:
+            return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing required X-CapForge-Key header.",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+    record = auth.auth_manager.authenticate(api_key)
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or revoked API key.",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+    return record
+
+
 app = FastAPI(
     title="CapForge API",
     description="Autonomous Capability Acquisition, Verification, and Evolution Runtime for AI Agents",
     version="1.1.0",
     lifespan=lifespan,
+    dependencies=[Depends(enforce_auth)],
 )
 
 app.state.limiter = limiter
@@ -114,11 +160,14 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=settings.cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+
 
 # Shared platform singletons
 registry = CapabilityRegistry()
@@ -705,7 +754,7 @@ def create_api_key(
     current_user: APIKeyRecord = Depends(require_roles(UserRole.ADMIN, UserRole.OPERATOR)),
 ):
     """Provision a new cryptographically hashed API key with scoped role and tenant boundaries."""
-    raw_token, rec = auth_manager.create_api_key(
+    raw_token, rec = auth.auth_manager.create_api_key(
         name=req.name,
         role=req.role,
         tenant_namespace=req.tenant_namespace,
@@ -718,7 +767,7 @@ def list_api_keys(
     current_user: APIKeyRecord = Depends(require_roles(UserRole.ADMIN, UserRole.OPERATOR)),
 ):
     """List provisioned API keys and their status."""
-    return auth_manager.list_keys()
+    return auth.auth_manager.list_keys()
 
 
 @app.post("/v1/auth/keys/{key_id}/revoke", tags=["Security & Auth"])
@@ -727,7 +776,7 @@ def revoke_api_key(
     current_user: APIKeyRecord = Depends(require_roles(UserRole.ADMIN)),
 ):
     """Revoke an active API key."""
-    success = auth_manager.revoke_key(key_id)
+    success = auth.auth_manager.revoke_key(key_id)
     if not success:
         raise HTTPException(status_code=404, detail=f"API key '{key_id}' not found.")
     return {"revoked": True, "key_id": key_id}
@@ -805,7 +854,10 @@ def create_webhook(req: CreateWebhookRequest):
         secret=req.secret,
         description=req.description,
     )
-    return webhook_manager.register(sub)
+    try:
+        return webhook_manager.register(sub)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"Rejected webhook target: {e}") from e
 
 
 @app.get("/v1/webhooks", response_model=list[WebhookSubscription], tags=["Webhooks"])
@@ -961,3 +1013,36 @@ def legacy_list_capabilities(
     cap_status: CapabilityStatus | None = Query(None, alias="status"),
 ):
     return registry.list_capabilities(domain=domain, status=cap_status)
+
+
+# ---------------------------------------------------------------------------
+# Model Context Protocol (MCP) SSE Transport Endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/v1/mcp/sse", tags=["MCP"])
+async def mcp_sse_endpoint(request: Request):
+    """Server-Sent Events endpoint for MCP client connections."""
+    import asyncio
+
+    from fastapi.responses import StreamingResponse
+
+    async def event_generator():
+        # Emit initial endpoint discovery event
+        init_event = json.dumps({"jsonrpc": "2.0", "method": "mcp/initialized", "params": {"server": "capforge-mcp"}})
+        yield f"event: message\ndata: {init_event}\n\n"
+        while True:
+            if await request.is_disconnected():
+                break
+            await asyncio.sleep(15)
+            yield ": keepalive\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/v1/mcp/messages", tags=["MCP"])
+async def mcp_message_handler(message: dict[str, Any] = Body(...)):
+    """Handle incoming JSON-RPC 2.0 message from an SSE-connected MCP client."""
+    from capforge.mcp.server import CapForgeMCPServer
+    server = CapForgeMCPServer(registry=registry, executor=executor)
+    return server.handle_message(message)

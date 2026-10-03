@@ -109,6 +109,8 @@ class CodeSignature:
     hmac_sig: str  # HMAC-SHA256(code_sha256, signing_key)
     signed_at: str  # ISO-8601 UTC timestamp
     signer_version: str = "1"  # Protocol version for future key rotation
+    algorithm: str = "hmac"  # hmac | ed25519
+    public_key_hex: str | None = None
 
 
 @dataclass
@@ -149,6 +151,14 @@ class SignatureStore:
     def _init_db(self) -> None:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute("PRAGMA journal_mode=WAL;")
+            try:
+                conn.execute("ALTER TABLE code_signatures ADD COLUMN algorithm TEXT NOT NULL DEFAULT 'hmac';")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                conn.execute("ALTER TABLE code_signatures ADD COLUMN public_key_hex TEXT;")
+            except sqlite3.OperationalError:
+                pass
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS code_signatures (
                     capability_id  TEXT NOT NULL,
@@ -157,6 +167,8 @@ class SignatureStore:
                     hmac_sig       TEXT NOT NULL,
                     signed_at      TEXT NOT NULL,
                     signer_version TEXT NOT NULL DEFAULT '1',
+                    algorithm      TEXT NOT NULL DEFAULT 'hmac',
+                    public_key_hex TEXT,
                     PRIMARY KEY (capability_id, version)
                 );
             """)
@@ -179,10 +191,19 @@ class SignatureStore:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO code_signatures
-                    (capability_id, version, code_sha256, hmac_sig, signed_at, signer_version)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (capability_id, version, code_sha256, hmac_sig, signed_at, signer_version, algorithm, public_key_hex)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-                (sig.capability_id, sig.version, sig.code_sha256, sig.hmac_sig, sig.signed_at, sig.signer_version),
+                (
+                    sig.capability_id,
+                    sig.version,
+                    sig.code_sha256,
+                    sig.hmac_sig,
+                    sig.signed_at,
+                    sig.signer_version,
+                    getattr(sig, "algorithm", "hmac"),
+                    getattr(sig, "public_key_hex", None),
+                ),
             )
             conn.commit()
 
@@ -190,7 +211,7 @@ class SignatureStore:
         with sqlite3.connect(self.db_path) as conn:
             row = conn.execute(
                 """
-                SELECT capability_id, version, code_sha256, hmac_sig, signed_at, signer_version
+                SELECT capability_id, version, code_sha256, hmac_sig, signed_at, signer_version, algorithm, public_key_hex
                 FROM code_signatures
                 WHERE capability_id = ? AND version = ?
             """,
@@ -205,6 +226,8 @@ class SignatureStore:
             hmac_sig=row[3],
             signed_at=row[4],
             signer_version=row[5],
+            algorithm=row[6] if len(row) > 6 and row[6] else "hmac",
+            public_key_hex=row[7] if len(row) > 7 else None,
         )
 
     def exists(self, capability_id: str, version: str) -> bool:
@@ -303,26 +326,80 @@ class TrustChain:
     # Guarantee 1: Sign at registration
     # -----------------------------------------------------------------------
 
-    def sign(self, capability: Capability) -> CodeSignature:
+
+    def _sign_ed25519(self, code_sha256: str) -> tuple[str, str]:
+        """Sign code hash using ED25519 asymmetric cryptography."""
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+
+        priv_key_env = os.environ.get("CAPFORGE_ED25519_PRIVATE_KEY")
+        if priv_key_env:
+            try:
+                priv_bytes = bytes.fromhex(priv_key_env)
+                private_key = ed25519.Ed25519PrivateKey.from_private_bytes(priv_bytes)
+            except Exception:
+                private_key = ed25519.Ed25519PrivateKey.generate()
+        else:
+            if not hasattr(self, "_ed25519_private_key"):
+                self._ed25519_private_key = ed25519.Ed25519PrivateKey.generate()
+            private_key = self._ed25519_private_key
+
+        public_key = private_key.public_key()
+        pub_bytes = public_key.public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        sig_bytes = private_key.sign(code_sha256.encode("utf-8"))
+        return sig_bytes.hex(), pub_bytes.hex()
+
+    def _verify_ed25519(self, code_sha256: str, signature_hex: str, public_key_hex: str | None) -> bool:
+        """Verify ED25519 asymmetric signature."""
+        if not public_key_hex:
+            return False
+        try:
+            from cryptography.hazmat.primitives.asymmetric import ed25519
+            pub_bytes = bytes.fromhex(public_key_hex)
+            public_key = ed25519.Ed25519PublicKey.from_public_bytes(pub_bytes)
+            sig_bytes = bytes.fromhex(signature_hex)
+            public_key.verify(sig_bytes, code_sha256.encode("utf-8"))
+            return True
+        except Exception:
+            return False
+
+    def sign(self, capability: Capability, algorithm: str | None = None) -> CodeSignature:
         """Sign a capability's code body at registration time.
 
         Returns the CodeSignature and persists it to the trust database.
         Must be called in the registry.register() flow.
         """
         code_sha256 = hashlib.sha256(capability.code_body.encode("utf-8")).hexdigest()
-        hmac_sig = hmac.new(
-            self._signing_key,
-            code_sha256.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
+        algo = (algorithm or os.environ.get("CAPFORGE_SIGNING_ALGORITHM", "hmac")).lower()
 
-        sig = CodeSignature(
-            capability_id=capability.id,
-            version=str(capability.version),
-            code_sha256=code_sha256,
-            hmac_sig=hmac_sig,
-            signed_at=datetime.now(UTC).isoformat(),
-        )
+        if algo == "ed25519":
+            sig_hex, pub_hex = self._sign_ed25519(code_sha256)
+            sig = CodeSignature(
+                capability_id=capability.id,
+                version=str(capability.version),
+                code_sha256=code_sha256,
+                hmac_sig=sig_hex,
+                signed_at=datetime.now(UTC).isoformat(),
+                algorithm="ed25519",
+                public_key_hex=pub_hex,
+            )
+        else:
+            hmac_sig = hmac.new(
+                self._signing_key,
+                code_sha256.encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
+            sig = CodeSignature(
+                capability_id=capability.id,
+                version=str(capability.version),
+                code_sha256=code_sha256,
+                hmac_sig=hmac_sig,
+                signed_at=datetime.now(UTC).isoformat(),
+                algorithm="hmac",
+            )
         self._store.save(sig)
         logger.info(
             "TrustChain: signed capability '%s' v%s (sha256=%s...)",
@@ -371,17 +448,20 @@ class TrustChain:
                 raise TamperDetectedError(capability.id, str(capability.version))
             return False
 
-        # Also verify the HMAC signature to ensure the stored hash itself wasn't modified
-        expected_hmac = hmac.new(
-            self._signing_key,
-            stored.code_sha256.encode("utf-8"),
-            hashlib.sha256,
-        ).hexdigest()
+        # Verify signature according to algorithm
+        if getattr(stored, "algorithm", "hmac") == "ed25519":
+            sig_valid = self._verify_ed25519(stored.code_sha256, stored.hmac_sig, stored.public_key_hex)
+        else:
+            expected_hmac = hmac.new(
+                self._signing_key,
+                stored.code_sha256.encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
+            sig_valid = hmac.compare_digest(stored.hmac_sig, expected_hmac)
 
-        hmac_valid = hmac.compare_digest(stored.hmac_sig, expected_hmac)
-        if not hmac_valid:
+        if not sig_valid:
             logger.error(
-                "TrustChain: HMAC INVALID for capability '%s' v%s — signature store may have been compromised",
+                "TrustChain: Signature INVALID for capability '%s' v%s — signature store may have been compromised",
                 capability.id,
                 capability.version,
             )

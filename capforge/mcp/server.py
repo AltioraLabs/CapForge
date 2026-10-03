@@ -1,8 +1,11 @@
 """CapForge Model Context Protocol (MCP) Server.
 
 Implements standard JSON-RPC 2.0 Model Context Protocol interface, allowing
-agents (Claude Desktop, Cursor, Antigravity IDE, LangChain, etc.) to discover,
-execute, synthesize, and inspect CapForge capabilities.
+agents (Claude Desktop, Cursor, Antigravity IDE, LangChain, CrewAI, AutoGen, etc.)
+to discover, execute, synthesize, and inspect CapForge capabilities over STDIO and SSE.
+
+Every registered capability in CapForge is dynamically exposed as a native MCP Tool
+with its formal JSON Schema input contract.
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ from capforge.registry.search import CapabilityMatcher
 from capforge.registry.store import CapabilityRegistry
 from capforge.runtime.executor import CapabilityExecutor
 
-logger = logging.getLogger("capforge.mcp")
+logger = logging.getLogger("capforge.mcp.server")
 
 
 class CapForgeMCPServer:
@@ -27,7 +30,7 @@ class CapForgeMCPServer:
 
     PROTOCOL_VERSION = "2024-11-05"
     SERVER_NAME = "capforge-mcp"
-    SERVER_VERSION = "0.4.0"
+    SERVER_VERSION = "1.1.0"
 
     def __init__(
         self,
@@ -41,8 +44,8 @@ class CapForgeMCPServer:
         self.matcher = CapabilityMatcher(self.registry)
 
     def get_tool_definitions(self) -> list[dict[str, Any]]:
-        """Return MCP standard tool declarations."""
-        return [
+        """Return MCP standard tool declarations, including dynamic registered capabilities."""
+        tools: list[dict[str, Any]] = [
             {
                 "name": "capforge_search_capabilities",
                 "description": "Search the CapForge capability registry for existing skills or tools matching a task intent.",
@@ -91,19 +94,42 @@ class CapForgeMCPServer:
                 "inputSchema": {
                     "type": "object",
                     "properties": {
-                        "task_intent": {
+                        "task_description": {
                             "type": "string",
-                            "description": "Description of the goal the agent needs to achieve.",
+                            "description": "Detailed prompt describing the capability logic and objectives.",
                         },
-                        "target_capability_id": {
+                        "domain": {
                             "type": "string",
-                            "description": "Desired identifier for the newly forged capability.",
+                            "description": "Functional domain (e.g. data_analysis, risk, math, devops).",
+                            "default": "general",
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Metadata tags categorizing the capability.",
+                            "default": [],
                         },
                     },
-                    "required": ["task_intent"],
+                    "required": ["task_description"],
                 },
             },
             {
+                "name": "capforge_list_capabilities",
+                "description": "List all registered capabilities in the system.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "status": {
+                            "type": "string",
+                            "description": "Filter by status: ACTIVE, EXPERIMENTAL, DEPRECATED, QUARANTINED.",
+                        }
+                    },
+                },
+            },
+            {
+                # Backward-compatibility alias: older clients/tests address the
+                # manifest export as a first-class tool. New clients may use
+                # the per-capability dynamic tools below.
                 "name": "capforge_get_manifest",
                 "description": "Export the canonical YAML manifest and verification report for a capability.",
                 "inputSchema": {
@@ -121,20 +147,58 @@ class CapForgeMCPServer:
                     "required": ["capability_id"],
                 },
             },
-            {
-                "name": "capforge_list_capabilities",
-                "description": "List all registered capabilities in the system.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "status": {
-                            "type": "string",
-                            "description": "Filter by status: ACTIVE, EXPERIMENTAL, DEPRECATED, QUARANTINED.",
-                        }
-                    },
-                },
-            },
         ]
+
+        # Dynamically expose every registered capability as an MCP Tool
+        try:
+            active_caps = self.registry.list_capabilities()
+            for cap in active_caps:
+                tool_name = f"capforge_{cap.id}" if not cap.id.startswith("capforge_") else cap.id
+
+                props: dict[str, Any] = {}
+                reqs: list[str] = []
+
+                for param_name, spec in cap.inputs.items():
+                    t_str = (spec.type or "string").lower()
+                    if "int" in t_str:
+                        js_type = "integer"
+                    elif "float" in t_str or "number" in t_str:
+                        js_type = "number"
+                    elif "bool" in t_str:
+                        js_type = "boolean"
+                    elif "list" in t_str or "array" in t_str:
+                        js_type = "array"
+                    elif "dict" in t_str or "object" in t_str:
+                        js_type = "object"
+                    else:
+                        js_type = "string"
+
+                    prop: dict[str, Any] = {
+                        "type": js_type,
+                        "description": spec.description or f"Input parameter {param_name}",
+                    }
+                    if spec.default is not None:
+                        prop["default"] = spec.default
+                    props[param_name] = prop
+
+                    if spec.required and spec.default is None:
+                        reqs.append(param_name)
+
+                tools.append(
+                    {
+                        "name": tool_name,
+                        "description": f"[CapForge Capability v{cap.version}] {cap.description}",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": props,
+                            "required": reqs,
+                        },
+                    }
+                )
+        except Exception as e:
+            logger.warning("Error fetching dynamic capabilities for MCP: %s", e)
+
+        return tools
 
     def handle_message(self, message: dict[str, Any]) -> dict[str, Any]:
         """Handle a single JSON-RPC 2.0 message."""
@@ -206,6 +270,9 @@ class CapForgeMCPServer:
             query = args.get("query", "")
             thresh = float(args.get("threshold", 0.20))
             matches = self.matcher.find_matches(query=query, threshold=thresh)
+            # find_matches returns (capability, score) tuples; unwrap defensively
+            # since older callers expect plain capability objects.
+            caps = [m[0] if isinstance(m, tuple) else m for m in matches]
             return [
                 {
                     "id": cap.id,
@@ -213,40 +280,65 @@ class CapForgeMCPServer:
                     "version": cap.version,
                     "status": cap.status.value,
                     "description": cap.description,
-                    "score": score,
+                    "domain": cap.domain,
                     "tags": cap.tags,
                 }
-                for cap, score in matches
+                for cap in caps
             ]
 
         elif name == "capforge_execute_capability":
-            req = ExecutionRequest(
-                capability_id=args["capability_id"],
-                version=args.get("version"),
-                inputs=args.get("inputs", {}),
-            )
-            res = self.executor.execute(req)
+            cap_id = args["capability_id"]
+            inputs = args.get("inputs", {})
+            version = args.get("version")
+            req = ExecutionRequest(capability_id=cap_id, version=version, inputs=inputs)
+            resp = self.executor.execute(req)
             return {
-                "capability_id": res.capability_id,
-                "version": res.version,
-                "status": res.status,
-                "output": res.output,
-                "error": res.error,
-                "execution_time_ms": res.execution_time_ms,
+                "capability_id": resp.capability_id,
+                "version": resp.version,
+                "status": resp.status,
+                "output": resp.output,
+                "error": resp.error,
+                "execution_time_ms": resp.execution_time_ms,
             }
 
         elif name == "capforge_synthesize_capability":
-            task_intent = args["task_intent"]
-            target_id = args.get("target_capability_id")
-            cap = self.synthesizer.synthesize_from_intent(task_intent, target_id=target_id)
+            desc = args["task_description"]
+            domain = args.get("domain", "general")
+            tags = args.get("tags", [])
+            cap = self.synthesizer.synthesize(task_description=desc, domain=domain, tags=tags)
+            self.registry.register(cap)
             return {
                 "capability_id": cap.id,
-                "name": cap.name,
                 "version": cap.version,
                 "status": cap.status.value,
-                "risk_level": cap.risk_level.value,
-                "description": cap.description,
+                "entrypoint": cap.entrypoint_function,
+                "verification_tests_count": len(cap.verification_tests),
+                "manifest_yaml": capability_to_yaml(cap),
             }
+
+        elif name == "capforge_list_capabilities":
+            status_filter = args.get("status")
+            if status_filter:
+                try:
+                    c_status = CapabilityStatus(status_filter.upper())
+                    caps = self.registry.list_capabilities(status=c_status)
+                except ValueError:
+                    caps = []
+            else:
+                caps = self.registry.list_capabilities()
+
+            return [
+                {
+                    "id": c.id,
+                    "version": c.version,
+                    "name": c.name,
+                    "status": c.status.value,
+                    "description": c.description,
+                    "domain": c.domain,
+                    "tags": c.tags,
+                }
+                for c in caps
+            ]
 
         elif name == "capforge_get_manifest":
             cap_id = args["capability_id"]
@@ -257,25 +349,22 @@ class CapForgeMCPServer:
             manifest_yaml = capability_to_yaml(cap)
             return {"capability_id": cap_id, "version": cap.version, "manifest_yaml": manifest_yaml}
 
-        elif name == "capforge_list_capabilities":
-            status_filter = None
-            if "status" in args and args["status"]:
-                status_filter = CapabilityStatus(args["status"].upper())
-            caps = self.registry.list_capabilities(status=status_filter)
-            return [
-                {
-                    "id": c.id,
-                    "name": c.name,
-                    "version": c.version,
-                    "status": c.status.value,
-                    "risk_level": c.risk_level.value,
-                    "description": c.description,
-                }
-                for c in caps
-            ]
+        # Dynamic Capability Execution
+        cap_id = name.removeprefix("capforge_") if name.startswith("capforge_") else name
+        cap = self.registry.get(cap_id)
+        if cap:
+            req = ExecutionRequest(capability_id=cap.id, inputs=args)
+            resp = self.executor.execute(req)
+            return {
+                "capability_id": resp.capability_id,
+                "version": resp.version,
+                "status": resp.status,
+                "output": resp.output,
+                "error": resp.error,
+                "execution_time_ms": resp.execution_time_ms,
+            }
 
-        else:
-            raise ValueError(f"Unknown MCP tool '{name}'")
+        raise ValueError(f"Unknown MCP tool: '{name}'")
 
     def _error_response(self, msg_id: Any, code: int, message: str) -> dict[str, Any]:
         return {
@@ -285,27 +374,18 @@ class CapForgeMCPServer:
         }
 
     def run_stdio(self) -> None:
-        """Run standard I/O loop for MCP client communication."""
-        if hasattr(sys.stdout, "reconfigure"):
-            sys.stdout.reconfigure(encoding="utf-8")
-        if hasattr(sys.stdin, "reconfigure"):
-            sys.stdin.reconfigure(encoding="utf-8")
-
+        """Run the MCP server in standard input/output (STDIO) transport loop."""
+        logger.info("CapForge MCP Server listening on STDIO")
         for line in sys.stdin:
             line = line.strip()
             if not line:
                 continue
             try:
-                req = json.loads(line)
-                resp = self.handle_message(req)
+                msg = json.loads(line)
+                resp = self.handle_message(msg)
                 sys.stdout.write(json.dumps(resp) + "\n")
                 sys.stdout.flush()
-            except json.JSONDecodeError:
-                err = self._error_response(None, -32700, "Parse error")
-                sys.stdout.write(json.dumps(err) + "\n")
+            except Exception as e:
+                err_resp = self._error_response(None, -32700, f"Parse error: {e}")
+                sys.stdout.write(json.dumps(err_resp) + "\n")
                 sys.stdout.flush()
-
-
-if __name__ == "__main__":
-    server = CapForgeMCPServer()
-    server.run_stdio()

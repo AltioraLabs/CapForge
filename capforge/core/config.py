@@ -4,6 +4,8 @@ All configuration is driven by environment variables with safe defaults.
 For production, set all variables marked [PROD] via .env or container secrets.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 from pathlib import Path
@@ -13,6 +15,41 @@ from pydantic import BaseModel, Field
 
 class Settings(BaseModel):
     """CapForge configuration loaded from environment variables with sensible defaults."""
+
+    # ---------------------------------------------------------------------------
+    # Distributed Registry & Storage
+    # ---------------------------------------------------------------------------
+    registry_backend: str = os.environ.get("CAPFORGE_REGISTRY_BACKEND", "sqlite")  # sqlite | postgres
+    postgres_url: str | None = os.environ.get("CAPFORGE_POSTGRES_URL")
+    storage_backend: str = os.environ.get("CAPFORGE_STORAGE_BACKEND", "local")  # local | s3
+    s3_bucket: str = os.environ.get("CAPFORGE_S3_BUCKET", "capforge-artifacts")
+    s3_endpoint_url: str | None = os.environ.get("CAPFORGE_S3_ENDPOINT_URL")
+    s3_region: str = os.environ.get("CAPFORGE_S3_REGION", "us-east-1")
+    s3_access_key: str | None = os.environ.get("CAPFORGE_S3_ACCESS_KEY")
+    s3_secret_key: str | None = os.environ.get("CAPFORGE_S3_SECRET_KEY")
+    s3_prefix: str = os.environ.get("CAPFORGE_S3_PREFIX", "capabilities/")
+
+    # ---------------------------------------------------------------------------
+    # Sandbox & Execution Driver
+    # ---------------------------------------------------------------------------
+    sandbox_driver: str = os.environ.get("CAPFORGE_SANDBOX_DRIVER", "auto")  # auto | subprocess | docker | wasm | in_process
+
+    # ---------------------------------------------------------------------------
+    # Cryptographic Security
+    # ---------------------------------------------------------------------------
+    signing_algorithm: str = os.environ.get("CAPFORGE_SIGNING_ALGORITHM", "hmac")  # hmac | ed25519
+    ed25519_private_key: str | None = os.environ.get("CAPFORGE_ED25519_PRIVATE_KEY")
+    ed25519_public_key: str | None = os.environ.get("CAPFORGE_ED25519_PUBLIC_KEY")
+    # Initial root admin key for FRESH installs only. If unset, a random key is
+    # generated per fresh database and printed once to server logs. Set this in
+    # production to a value from your secret manager (then rotate immediately).
+    bootstrap_admin_key: str | None = os.environ.get("CAPFORGE_BOOTSTRAP_ADMIN_KEY")
+
+    # ---------------------------------------------------------------------------
+    # Telemetry & Observability
+    # ---------------------------------------------------------------------------
+    telemetry_enabled: bool = os.environ.get("CAPFORGE_TELEMETRY_ENABLED", "true").lower() == "true"
+    otlp_endpoint: str | None = os.environ.get("CAPFORGE_OTLP_ENDPOINT")
 
     # ---------------------------------------------------------------------------
     # Base Paths
@@ -45,6 +82,21 @@ class Settings(BaseModel):
     # ---------------------------------------------------------------------------
     api_host: str = os.environ.get("CAPFORGE_API_HOST", "127.0.0.1")
     api_port: int = int(os.environ.get("CAPFORGE_API_PORT", "8000"))
+    cors_origins: str = os.environ.get(
+        "CAPFORGE_CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    )
+    webhook_allow_private_nets: bool = os.environ.get("CAPFORGE_WEBHOOK_ALLOW_PRIVATE", "false").lower() == "true"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parsed CORS origin allowlist (never '*' together with credentials)."""
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def cors_allow_credentials(self) -> bool:
+        """Credentials only when origins are explicitly pinned (never with '*')."""
+        origins = self.cors_origins_list
+        return bool(origins) and "*" not in origins
 
     # ---------------------------------------------------------------------------
     # [PROD] LLM Synthesis — Gemini API
@@ -102,11 +154,28 @@ class Settings(BaseModel):
         self.capabilities_dir.mkdir(parents=True, exist_ok=True)
 
     @property
+    def effective_llm_provider(self) -> str:
+        """Determines active synthesis provider, auto-detecting available keys if unconfigured."""
+        explicit = os.environ.get("CAPFORGE_LLM_PROVIDER")
+        if explicit:
+            return explicit
+        if self.llm_provider == "ollama":
+            return "ollama"
+        if self.gemini_api_key:
+            return "gemini"
+        if self.openai_api_key:
+            return "openai"
+        return self.llm_provider
+
+    @property
     def llm_configured(self) -> bool:
-        """True if a real LLM is configured for synthesis."""
-        if self.llm_provider == "gemini":
+        """True if a real remote LLM provider is configured with credentials."""
+        provider = self.effective_llm_provider
+        if provider == "ollama":
+            return True
+        if provider == "gemini":
             return bool(self.gemini_api_key)
-        if self.llm_provider == "openai":
+        if provider == "openai":
             return bool(self.openai_api_key)
         return False
 

@@ -92,6 +92,7 @@ def _resolve_type_name(annotation: Any) -> str:
 def capability(
     id: str | None = None,
     name: str | None = None,
+    description: str | None = None,
     domain: str = "general",
     risk_level: str = "LOW",
     tags: list[str] | None = None,
@@ -110,7 +111,7 @@ def capability(
     def decorator(func: Callable) -> Callable:
         cap_id = id or func.__name__
         cap_name = name or func.__name__.replace("_", " ").title()
-        description = inspect.getdoc(func) or f"Capability: {cap_name}"
+        desc = description or inspect.getdoc(func) or f"Capability: {cap_name}"
 
         sig = inspect.signature(func)
         inputs: dict[str, ParameterSpec] = {}
@@ -179,7 +180,7 @@ def capability(
             name=cap_name,
             version=version,
             namespace=namespace,
-            description=description,
+            description=desc,
             domain=domain,
             tags=tags or [],
             risk_level=resolved_risk,
@@ -229,7 +230,7 @@ class CapForgeClient:
     def __init__(
         self,
         db_path: str | Path | None = None,
-        enable_trust_chain: bool = False,
+        enable_trust_chain: bool = True,
         enable_security_scan: bool = True,
         auto_evaluate: bool = True,
         server_url: str | None = None,
@@ -282,6 +283,11 @@ class CapForgeClient:
         if self._agent is None:
             self._agent = CapForgeAgent(registry=self.registry)
         return self._agent
+
+    @property
+    def event_gateway(self):
+        """Universal Event Gateway instance."""
+        return self.agent.event_gateway
 
     @property
     def evaluator(self) -> CapabilityEvaluator:
@@ -455,12 +461,16 @@ class CapForgeClient:
         inputs: dict[str, Any] | None = None,
         knowledge_spec: dict[str, Any] | None = None,
         agent_id: str | None = "default",
+        task_inputs: dict[str, Any] | None = None,
+        run_id: str | None = None,
     ) -> AgentLifecycleTrace:
+        resolved_inputs = inputs if inputs is not None else (task_inputs or {})
         return self.agent.handle_task(
             task_intent=task_intent,
-            task_inputs=inputs or {},
+            task_inputs=resolved_inputs,
             knowledge_spec=knowledge_spec,
             agent_id=agent_id,
+            run_id=run_id,
         )
 
     def get(self, capability_id: str, version: str | None = None) -> Capability | None:
@@ -475,6 +485,10 @@ class CapForgeClient:
             resp.raise_for_status()
             return Capability.model_validate(resp.json())
         return self.registry.get(capability_id, version=version)
+
+    def list(self, status=None, domain=None):
+        """Convenience alias for list_capabilities."""
+        return self.list_capabilities(status=status, domain=domain)
 
     def list_capabilities(
         self,
@@ -589,6 +603,7 @@ class CapForgeClient:
         events: list[str] | None = None,
         secret: str | None = None,
         description: str = "",
+        allow_private_nets: bool | None = None,
     ) -> WebhookSubscription:
         if self.is_remote:
             client = self._get_http_client()
@@ -600,7 +615,7 @@ class CapForgeClient:
             return WebhookSubscription.model_validate(resp.json())
 
         sub = WebhookSubscription(url=url, events=events or [], secret=secret, description=description)
-        return self.webhooks.register(sub)
+        return self.webhooks.register(sub, allow_private_nets=allow_private_nets)
 
     def unsubscribe_webhook(self, webhook_id: str) -> bool:
         if self.is_remote:

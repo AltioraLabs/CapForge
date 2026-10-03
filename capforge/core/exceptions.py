@@ -1,5 +1,7 @@
 """CapForge Typed Exceptions."""
 
+from __future__ import annotations
+
 
 class CapForgeError(Exception):
     """Base class for all CapForge exceptions."""

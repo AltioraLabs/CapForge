@@ -1,9 +1,11 @@
 """CapForge Sandbox Execution Engine.
 
-Executes capability code within a bounded, safe execution context.
-Provides two execution modes:
-  1. ProcessSandbox (default) — subprocess-based isolation with timeout
-  2. InProcessSandbox — exec-based for testing/development only
+Executes capability code within a bounded, isolated execution context.
+Supports pluggable execution drivers:
+  - SubprocessSandboxDriver (default process-level isolation)
+  - DockerSandboxDriver (hardware-constrained OCI container isolation)
+  - WasmSandboxDriver (browser/edge WebAssembly Pyodide isolation)
+  - InProcessSandboxDriver (development/testing only)
 
 Enforces execution timeouts, intercepts exceptions, and captures execution metrics.
 """
@@ -11,6 +13,7 @@ Enforces execution timeouts, intercepts exceptions, and captures execution metri
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -18,47 +21,121 @@ import tempfile
 import textwrap
 import time
 import traceback
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
-from capforge.core.exceptions import SandboxExecutionError
+from capforge.core.telemetry import GenAISemanticConventions, trace_manager
+
+logger = logging.getLogger("capforge.sandbox")
 
 
-class SandboxRunner:
-    """Safely executes capability code in a subprocess with timeout enforcement.
+# ---------------------------------------------------------------------------
+# Sandbox Driver Protocol
+# ---------------------------------------------------------------------------
 
-    This replaces the previous in-process exec() approach with proper
-    process isolation to prevent untrusted code from corrupting the host.
-    """
 
-    def __init__(
+@runtime_checkable
+class SandboxDriver(Protocol):
+    """Protocol for pluggable sandbox execution drivers."""
+
+    def execute_code(
         self,
-        default_timeout_sec: float = 15.0,
-        python_executable: str | None = None,
-        use_subprocess: bool = True,
-    ) -> None:
-        self.default_timeout_sec = default_timeout_sec
+        code_body: str,
+        entrypoint: str,
+        inputs: dict[str, Any],
+        timeout_sec: float | None = None,
+        env_overrides: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Execute code within the driver isolation domain."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# Concrete Drivers
+# ---------------------------------------------------------------------------
+
+
+class InProcessSandboxDriver:
+    """Fast in-process exec runner for development and internal testing."""
+
+    def execute_code(
+        self,
+        code_body: str,
+        entrypoint: str,
+        inputs: dict[str, Any],
+        timeout_sec: float | None = None,
+        env_overrides: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        start = time.perf_counter()
+        exec_globals: dict[str, Any] = {"__builtins__": __builtins__}
+        try:
+            compiled = compile(code_body, "<capforge_inprocess>", "exec")
+            exec(compiled, exec_globals)
+            fn = exec_globals.get(entrypoint)
+            if not fn or not callable(fn):
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": f"Entrypoint '{entrypoint}' not found or not callable",
+                    "traceback": None,
+                    "execution_time_ms": round((time.perf_counter() - start) * 1000, 2),
+                }
+            try:
+                res = fn(**inputs) if isinstance(inputs, dict) else fn(inputs)
+            except TypeError:
+                res = fn(inputs)
+            return {
+                "success": True,
+                "output": res,
+                "error": None,
+                "traceback": None,
+                "execution_time_ms": round((time.perf_counter() - start) * 1000, 2),
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "output": None,
+                "error": f"{type(e).__name__}: {e}",
+                "traceback": traceback.format_exc(),
+                "execution_time_ms": round((time.perf_counter() - start) * 1000, 2),
+            }
+
+
+def _sandbox_rlimits() -> None:
+    """Apply POSIX resource caps to a sandboxed child process (preexec_fn).
+
+    Bounds address space (~1 GiB) and CPU time so a runaway capability fails
+    fast instead of OOM-ing the host.
+    """
+    import resource as _resource
+
+    _resource.setrlimit(_resource.RLIMIT_AS, (1 << 30, 1 << 30))
+    _resource.setrlimit(_resource.RLIMIT_CPU, (30, 30))
+
+
+def _posix_rlimits_supported() -> bool:
+    """True on platforms with the resource module (POSIX); False on Windows
+    (where the execution timeout remains the only bound — prefer Docker)."""
+    import importlib.util
+
+    return importlib.util.find_spec("resource") is not None
+
+
+_HAS_POSIX_RLIMITS = _posix_rlimits_supported()
+
+
+class ProcessSandboxDriver:
+    """Subprocess-based isolation runner with sanitized environment and timeout."""
+
+    def __init__(self, python_executable: str | None = None):
         self.python_executable = python_executable or sys.executable
-        self.use_subprocess = use_subprocess
 
     @staticmethod
     def _build_sanitized_env() -> dict[str, str]:
-        """Filter out sensitive credentials and tokens from sandbox subprocess environment."""
         sensitive_patterns = ("KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL", "AUTH", "PRIVATE")
         safe_keys = {
-            "PATH",
-            "SYSTEMROOT",
-            "WINDIR",
-            "TEMP",
-            "TMP",
-            "PYTHONPATH",
-            "PYTHONHOME",
-            "LANG",
-            "LC_ALL",
-            "USERPROFILE",
-            "HOMEPATH",
-            "HOMEDRIVE",
-            "COMSPEC",
-            "PATHEXT",
+            "PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "APPDATA", "LOCALAPPDATA",
+            "PYTHONPATH", "PYTHONHOME", "LANG", "LC_ALL", "USERPROFILE", "HOMEPATH",
+            "HOMEDRIVE", "COMSPEC", "PATHEXT",
         }
         clean_env = {"PYTHONDONTWRITEBYTECODE": "1"}
         for k, v in os.environ.items():
@@ -77,40 +154,17 @@ class SandboxRunner:
         timeout_sec: float | None = None,
         env_overrides: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        """Execute code in an isolated context and return output and execution time.
-
-        Args:
-            env_overrides: Optional key-value pairs merged into the sandbox env.
-                Used by AdversarialTester to inject test/prod environment markers.
-        """
-        if self.use_subprocess:
-            return self._execute_subprocess(code_body, entrypoint, inputs, timeout_sec, env_overrides)
-        else:
-            return self._execute_in_process(code_body, entrypoint, inputs, timeout_sec)
-
-    def _execute_subprocess(
-        self,
-        code_body: str,
-        entrypoint: str,
-        inputs: dict[str, Any],
-        timeout_sec: float | None = None,
-        env_overrides: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
-        """Execute code in a subprocess for isolation."""
-        timeout = timeout_sec or self.default_timeout_sec
+        timeout = timeout_sec or 30.0
         start_time = time.perf_counter()
 
-        # Build the runner script
         runner_script = textwrap.dedent(f"""\
             import json
             import sys
             import traceback
 
-            # Read inputs from stdin
             inputs_json = sys.stdin.read()
             inputs = json.loads(inputs_json)
 
-            # Execute the capability code
             try:
                 exec_globals = {{"__builtins__": __builtins__}}
                 code_body = {code_body!r}
@@ -136,142 +190,205 @@ class SandboxRunner:
                     "output": result,
                     "error": None,
                     "traceback": None,
-                }}))
+                }}, default=str))
             except Exception as e:
                 print(json.dumps({{
                     "success": False,
                     "output": None,
-                    "error": f"{{type(e).__name__}}: {{str(e)}}",
+                    "error": str(e),
                     "traceback": traceback.format_exc(),
                 }}))
         """)
 
+        env = self._build_sanitized_env()
+        if env_overrides:
+            env.update(env_overrides)
+
+        tmp_script = None
         try:
-            # Write runner to temp file
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                suffix=".py",
-                delete=False,
-                prefix="sf_sandbox_",
-            ) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, encoding="utf-8") as f:
                 f.write(runner_script)
-                runner_path = f.name
+                tmp_script = f.name
+
+            proc = subprocess.Popen(
+                [self.python_executable, tmp_script],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+                text=True,
+                encoding="utf-8",
+                preexec_fn=_sandbox_rlimits if _HAS_POSIX_RLIMITS else None,
+            )
 
             try:
-                sandbox_env = self._build_sanitized_env()
-                # Apply env_overrides AFTER sanitization (used for adversarial blindness testing)
-                if env_overrides:
-                    sandbox_env.update(env_overrides)
-                process = subprocess.run(
-                    [self.python_executable, runner_path],
-                    input=json.dumps(inputs),
-                    capture_output=True,
-                    text=True,
+                stdout, stderr = proc.communicate(
+                    input=json.dumps(inputs, default=str),
                     timeout=timeout,
-                    env=sandbox_env,
                 )
-
-                elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-
-                if process.returncode != 0 and not process.stdout.strip():
-                    return {
-                        "success": False,
-                        "output": None,
-                        "error": f"Process exited with code {process.returncode}: {process.stderr[:500]}",
-                        "traceback": process.stderr,
-                        "execution_time_ms": round(elapsed_ms, 2),
-                    }
-
-                # Parse JSON output
-                try:
-                    result = json.loads(process.stdout)
-                    result["execution_time_ms"] = round(elapsed_ms, 2)
-                    return result
-                except json.JSONDecodeError:
-                    return {
-                        "success": False,
-                        "output": None,
-                        "error": f"Invalid JSON output from sandbox: {process.stdout[:300]}",
-                        "traceback": process.stderr,
-                        "execution_time_ms": round(elapsed_ms, 2),
-                    }
-
             except subprocess.TimeoutExpired:
-                elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                proc.kill()
+                proc.communicate()
+                elapsed_ms = (time.perf_counter() - start_time) * 1000
                 return {
                     "success": False,
                     "output": None,
-                    "error": f"Execution timed out after {timeout}s",
+                    "error": f"Execution timed out after {timeout} seconds",
+                    "execution_time_ms": elapsed_ms,
                     "traceback": None,
-                    "execution_time_ms": round(elapsed_ms, 2),
                 }
-            finally:
-                # Cleanup temp file
+
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+            if proc.returncode != 0 and not stdout.strip():
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": f"Subprocess exited with code {proc.returncode}: {stderr.strip()}",
+                    "execution_time_ms": elapsed_ms,
+                    "traceback": stderr.strip() if stderr.strip() else None,
+                }
+
+            try:
+                result = json.loads(stdout.strip())
+                result["execution_time_ms"] = elapsed_ms
+                return result
+            except json.JSONDecodeError:
+                return {
+                    "success": False,
+                    "output": None,
+                    "error": f"Failed to parse subprocess output: {stdout[:200]}",
+                    "execution_time_ms": elapsed_ms,
+                    "traceback": stderr.strip() if stderr.strip() else None,
+                }
+        finally:
+            if tmp_script and os.path.exists(tmp_script):
                 try:
-                    os.unlink(runner_path)
+                    os.unlink(tmp_script)
                 except OSError:
                     pass
 
-        except Exception as e:
-            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-            return {
-                "success": False,
-                "output": None,
-                "error": f"Sandbox setup error: {type(e).__name__}: {str(e)}",
-                "traceback": traceback.format_exc(),
-                "execution_time_ms": round(elapsed_ms, 2),
-            }
 
-    def _execute_in_process(
+class DockerSandboxDriver:
+    """Hardware-isolated OCI container driver."""
+
+    def __init__(self, **kwargs: Any):
+        from capforge.verification.sandbox_docker import DockerSandboxRunner
+        self._runner = DockerSandboxRunner(**kwargs)
+
+    def execute_code(
         self,
         code_body: str,
         entrypoint: str,
         inputs: dict[str, Any],
         timeout_sec: float | None = None,
+        env_overrides: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        """Execute code in an isolated dictionary namespace (development/test mode).
+        return self._runner.execute_code(
+            code_body,
+            entrypoint,
+            inputs,
+            timeout_sec=timeout_sec or 15.0,
+        )
 
-        WARNING: This does NOT provide security isolation. Use subprocess mode
-        for any untrusted code.
-        """
-        start_time = time.perf_counter()
 
-        scope: dict[str, Any] = {
-            "__builtins__": __builtins__,
-            "inputs": inputs,
-        }
+class WasmSandboxDriver:
+    """WASM / Pyodide browser-compatible driver."""
 
-        try:
-            compiled_code = compile(code_body, filename="<capforge_sandbox>", mode="exec")
-            exec(compiled_code, scope)
+    def __init__(self, **kwargs: Any):
+        from capforge.verification.sandbox_wasm import WasmSandboxRunner
+        self._runner = WasmSandboxRunner(**kwargs)
 
-            target_fn = scope.get(entrypoint)
-            if not target_fn or not callable(target_fn):
-                raise SandboxExecutionError(
-                    f"Entrypoint function '{entrypoint}' not defined or not callable in candidate capability code."
-                )
+    def execute_code(
+        self,
+        code_body: str,
+        entrypoint: str,
+        inputs: dict[str, Any],
+        timeout_sec: float | None = None,
+        env_overrides: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        return self._runner.execute_code(
+            code_body,
+            entrypoint,
+            inputs,
+            timeout_sec=timeout_sec or 15.0,
+        )
 
-            try:
-                result = target_fn(**inputs) if isinstance(inputs, dict) else target_fn(inputs)
-            except TypeError:
-                result = target_fn(inputs)
-            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
 
-            return {
-                "success": True,
-                "output": result,
-                "error": None,
-                "traceback": None,
-                "execution_time_ms": round(elapsed_ms, 2),
-            }
+# ---------------------------------------------------------------------------
+# Driver Factory and Unified Runner
+# ---------------------------------------------------------------------------
 
-        except Exception as e:
-            elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-            tb_str = traceback.format_exc()
-            return {
-                "success": False,
-                "output": None,
-                "error": f"{type(e).__name__}: {str(e)}",
-                "traceback": tb_str,
-                "execution_time_ms": round(elapsed_ms, 2),
-            }
+
+def get_sandbox_driver(name: str = "auto", **kwargs: Any) -> SandboxDriver:
+    """Factory to retrieve requested sandbox execution driver.
+
+    "auto" (the default) selects the strongest available isolation: Docker
+    when the daemon is reachable, otherwise the hardened subprocess driver.
+    The Docker probe is cached, so auto-resolution costs nothing per call.
+    """
+    normalized = name.lower().strip()
+    if normalized == "auto":
+        from capforge.verification.sandbox_docker import docker_available
+
+        normalized = "docker" if docker_available() else "subprocess"
+    if normalized in ("subprocess", "process"):
+        return ProcessSandboxDriver(**kwargs)
+    elif normalized in ("docker", "container"):
+        return DockerSandboxDriver(**kwargs)
+    elif normalized in ("wasm", "pyodide"):
+        return WasmSandboxDriver(**kwargs)
+    elif normalized in ("in_process", "inprocess", "direct"):
+        return InProcessSandboxDriver()
+    else:
+        logger.warning("Unknown sandbox driver '%s', falling back to subprocess", name)
+        return ProcessSandboxDriver(**kwargs)
+
+
+class SandboxRunner:
+    """Unified sandbox execution runner maintaining backwards compatibility."""
+
+    def __init__(
+        self,
+        default_timeout_sec: float = 30.0,
+        python_executable: str | None = None,
+        use_subprocess: bool = True,
+        driver: SandboxDriver | str | None = None,
+    ) -> None:
+        self.default_timeout_sec = default_timeout_sec
+        self.python_executable = python_executable or sys.executable
+        self.use_subprocess = use_subprocess
+
+        if isinstance(driver, SandboxDriver):
+            self.driver: SandboxDriver = driver
+        elif isinstance(driver, str):
+            self.driver = get_sandbox_driver(driver, python_executable=self.python_executable)
+        elif not use_subprocess:
+            self.driver = InProcessSandboxDriver()
+        else:
+            from capforge.core.config import settings
+
+            self.driver = get_sandbox_driver(
+                settings.sandbox_driver, python_executable=self.python_executable
+            )
+
+    def execute_code(
+        self,
+        code_body: str,
+        entrypoint: str,
+        inputs: dict[str, Any],
+        timeout_sec: float | None = None,
+        env_overrides: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        timeout = timeout_sec or self.default_timeout_sec
+        with trace_manager.start_span("capforge.sandbox.execute") as span:
+            span.set_attribute(GenAISemanticConventions.SANDBOX_DRIVER, type(self.driver).__name__)
+            res = self.driver.execute_code(
+                code_body=code_body,
+                entrypoint=entrypoint,
+                inputs=inputs,
+                timeout_sec=timeout,
+                env_overrides=env_overrides,
+            )
+            span.set_attribute("success", res.get("success", False))
+            return res

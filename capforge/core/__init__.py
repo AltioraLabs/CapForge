@@ -1,5 +1,7 @@
 """CapForge Core Module — Models, Configuration, Events, Governance, Exceptions."""
 
+from __future__ import annotations
+
 from capforge.core.budget import BudgetConfig, EvolutionBudgetManager, budget_manager
 from capforge.core.config import settings, setup_logging
 from capforge.core.events import EventGateway, ExperienceFilter

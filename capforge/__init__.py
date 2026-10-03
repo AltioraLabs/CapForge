@@ -1,5 +1,7 @@
 """CapForge: Autonomous Capability Acquisition, Verification, and Evolution Runtime for AI Agents."""
 
+from __future__ import annotations
+
 __version__ = "1.1.0"
 
 # Core models are imported eagerly — they are pure data classes with no side effects
@@ -23,6 +25,21 @@ from capforge.core.models import (
 # All other imports are lazy to avoid circular import chains.
 # Access them as `capforge.CapabilityRegistry` etc. — they load on first use.
 _LAZY_IMPORTS = {
+    # Schemas & Contracts
+    "CapabilitySchema": "capforge.core.schemas",
+    "FieldSchema": "capforge.core.schemas",
+    # Distributed Storage
+    "PostgresCapabilityRegistry": "capforge.registry.store_postgres",
+    "S3ArtifactStore": "capforge.registry.store_s3",
+    # Sandbox Drivers
+    "WasmSandboxRunner": "capforge.verification.sandbox_wasm",
+    "get_sandbox_driver": "capforge.verification.sandbox",
+    "ProcessSandboxDriver": "capforge.verification.sandbox",
+    "DockerSandboxDriver": "capforge.verification.sandbox",
+    "WasmSandboxDriver": "capforge.verification.sandbox",
+    # Telemetry Semantics
+    "GenAISemanticConventions": "capforge.core.telemetry",
+    "record_llm_call": "capforge.core.telemetry",
     # Events
     "EventGateway": "capforge.core.events",
     "ExperienceFilter": "capforge.core.events",
@@ -150,6 +167,14 @@ __all__ = [
     "ToolPermissions",
     "VerificationResult",
     # Lazily imported components
+        "CapabilitySchema",
+    "FieldSchema",
+    "PostgresCapabilityRegistry",
+    "S3ArtifactStore",
+    "WasmSandboxRunner",
+    "get_sandbox_driver",
+    "GenAISemanticConventions",
+    "record_llm_call",
     "AcquisitionJobWorker",
     "AdversarialTester",
     "AutonomousAcquisitionEngine",
@@ -212,3 +237,13 @@ __all__ = [
     "setup_logging",
     "trigger_engine",
 ]
+
+# Advanced Capabilities
+from capforge.optimization.profiler import OptimizationGap, RuntimeProfiler, profiler  # noqa: E402
+from capforge.optimization.transpiler import HotPathAnalyzer, RustTranspiler  # noqa: E402
+from capforge.verification.formal import (  # noqa: E402
+    PreExecutionContractChecker,
+    SMTInvariantVerifier,
+    formal_verifier,
+)
+from capforge.verification.mutation import MutationEngine, MutationReport  # noqa: E402

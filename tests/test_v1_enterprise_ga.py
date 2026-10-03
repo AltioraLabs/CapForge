@@ -153,33 +153,27 @@ def test_api_v1_auth_and_hybrid_search_endpoints():
     assert isinstance(resp.json(), list)
 
     # 2. Key provisioning — requires ADMIN or OPERATOR key
-    # Use the bootstrap root admin key (always present in test env with dev_mode=true)
-    admin_key = "sf_live_master_admin_secret"  # bootstrap key from auth.py
+    # No hardcoded bootstrap secret: in dev_mode the suite runs keyless and the
+    # request is served as root admin. Provision a fresh worker key for use below.
     key_payload = {
         "name": "E2E Automated Worker",
         "role": "AGENT_RUNNER",
         "tenant_namespace": "production",
     }
-    key_resp = client.post(
-        "/v1/auth/keys",
-        json=key_payload,
-        headers={"X-CapForge-Key": admin_key},
-    )
+    key_resp = client.post("/v1/auth/keys", json=key_payload)
     assert key_resp.status_code == 200, f"Key create failed: {key_resp.text}"
     data = key_resp.json()
     assert "api_key" in data
     assert data["api_key"].startswith("sf_live_")
     key_id = data["record"]["key_id"]
+    _admin_key = data["api_key"]
 
-    # 3. List keys — requires ADMIN or OPERATOR key
-    list_resp = client.get("/v1/auth/keys", headers={"X-CapForge-Key": admin_key})
+    # 3. List keys — requires ADMIN or OPERATOR key (keyless in dev_mode = root admin)
+    list_resp = client.get("/v1/auth/keys")
     assert list_resp.status_code == 200
     assert any(k["key_id"] == key_id for k in list_resp.json())
 
-    # 4. Revoke key — requires ADMIN key
-    revoke_resp = client.post(
-        f"/v1/auth/keys/{key_id}/revoke",
-        headers={"X-CapForge-Key": admin_key},
-    )
+    # 4. Revoke key — requires ADMIN key (keyless in dev_mode = root admin)
+    revoke_resp = client.post(f"/v1/auth/keys/{key_id}/revoke")
     assert revoke_resp.status_code == 200
     assert revoke_resp.json()["revoked"] is True

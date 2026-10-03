@@ -31,6 +31,9 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
+from capforge.core.config import settings
+from capforge.security.ssrf_guard import SSRFBlockedError, redact_url, validate_webhook_url
+
 logger = logging.getLogger("capforge.webhooks")
 
 
@@ -46,6 +49,11 @@ class WebhookSubscription(BaseModel):
     description: str = ""
     failure_count: int = 0
     max_failures: int = 10
+    allow_private_nets: bool = Field(
+        default=False,
+        description="Permit loopback/private targets for this subscription (dev loopback receivers). "
+        "Set once at registration; re-checked on every delivery. Metadata endpoints stay blocked.",
+    )
 
 
 class WebhookDelivery(BaseModel):
@@ -61,6 +69,10 @@ class WebhookDelivery(BaseModel):
     delivered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class WebhookLimitExceeded(ValueError):
+    """Raised when the webhook subscription quota is exhausted."""
+
+
 class WebhookManager:
     """Manages webhook subscriptions and delivery.
 
@@ -68,18 +80,43 @@ class WebhookManager:
     This implementation provides synchronous delivery with failure tracking.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, max_subscriptions: int = 1000) -> None:
         self._subscriptions: dict[str, WebhookSubscription] = {}
         self._delivery_log: list[WebhookDelivery] = []
         self._max_log_size: int = 1000
+        self._max_subscriptions = max_subscriptions
 
-    def register(self, subscription: WebhookSubscription) -> WebhookSubscription:
-        """Register a new webhook subscription."""
+    def register(
+        self,
+        subscription: WebhookSubscription,
+        *,
+        allow_private_nets: bool | None = None,
+    ) -> WebhookSubscription:
+        """Register a new webhook subscription.
+
+        The target URL passes SSRF validation first; blocked targets raise
+        SSRFBlockedError (a ValueError) and are never stored or dispatched to.
+        Pass allow_private_nets=True only for loopback/dev receivers; cloud
+        metadata endpoints stay blocked regardless.
+        """
+        if len(self._subscriptions) >= self._max_subscriptions:
+            raise WebhookLimitExceeded(
+                f"webhook subscription limit reached ({self._max_subscriptions}); "
+                "delete unused subscriptions first"
+            )
+        if allow_private_nets is None:
+            allow_private_nets = settings.webhook_allow_private_nets
+        try:
+            subscription.url = validate_webhook_url(subscription.url, allow_private=allow_private_nets)
+        except SSRFBlockedError as e:
+            logger.warning("Rejected webhook '%s' target: %s", subscription.id, e)
+            raise
+        subscription.allow_private_nets = bool(allow_private_nets)
         self._subscriptions[subscription.id] = subscription
         logger.info(
             "Registered webhook '%s' -> %s (events=%s)",
             subscription.id,
-            subscription.url,
+            redact_url(subscription.url),
             subscription.events or ["*"],
         )
         return subscription
@@ -161,6 +198,22 @@ class WebhookManager:
                 hashlib.sha256,
             ).hexdigest()
             headers["X-CapForge-Signature"] = f"sha256={signature}"
+
+        # Re-verify URL at delivery time to prevent DNS-rebinding / TOCTOU SSRF attacks.
+        # Honors the per-subscription allowance decided at registration (single
+        # source of truth lives on the subscription, not the process env).
+        try:
+            validate_webhook_url(subscription.url, allow_private=subscription.allow_private_nets)
+        except SSRFBlockedError as err:
+            logger.error("SSRF check failed at delivery time for webhook '%s': %s", subscription.id, err)
+            return WebhookDelivery(
+                subscription_id=subscription.id,
+                event_type=event_type,
+                url=subscription.url,
+                status_code=None,
+                success=False,
+                error=f"SSRF_BLOCKED: {err}",
+            )
 
         # Attempt HTTP delivery
         try:

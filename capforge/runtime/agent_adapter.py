@@ -115,11 +115,34 @@ class CapForgeAgent:
             candidate = self.acquisition_engine.acquire_from_spec(spec, trace.gap)
             candidate.verification_tests = self.test_generator.enrich_tests(candidate)
 
+            self.event_gateway.emit(
+                AgentEvent(
+                    event_type=EventType.CAPABILITY_GENERATED,
+                    agent_id=agent_id,
+                    run_id=run_id,
+                    metadata={"capability_id": candidate.id, "version": candidate.version},
+                )
+            )
+
             # Step 2: Sandbox Verification & Self-Healing
             repaired_cap, verif_result, iters = self.repair_engine.repair_until_pass(candidate)
             trace.acquired_capability = repaired_cap
             trace.verification = verif_result
             trace.repair_iterations = iters
+
+            self.event_gateway.emit(
+                AgentEvent(
+                    event_type=EventType.CAPABILITY_VALIDATED,
+                    agent_id=agent_id,
+                    run_id=run_id,
+                    metadata={
+                        "capability_id": repaired_cap.id,
+                        "passed": verif_result.passed,
+                        "tests_passed": verif_result.tests_passed,
+                        "tests_run": verif_result.tests_run,
+                    },
+                )
+            )
 
             # Step 3: Risk Assessment & Lifecycle Promotion
             if verif_result.passed:
@@ -152,9 +175,14 @@ class CapForgeAgent:
                 return trace
         else:
             # Direct reuse from Capability Registry
-            matches = self.registry.list_capabilities()
-            if matches:
-                target_cap_id = matches[0].id
+            matched_pairs = self.gap_detector.matcher.find_matches(task_intent, threshold=0.30)
+            if matched_pairs:
+                target_cap_id = matched_pairs[0][0].id
+            else:
+                matches = self.registry.list_capabilities()
+                if matches:
+                    target_cap_id = matches[0].id
+            if target_cap_id:
                 trace.reused_primitives.append(target_cap_id)
 
         # Step 4: Execute Capability in Sandbox

@@ -147,6 +147,45 @@ def _synthesize_with_openai(task_intent: str, api_key: str, model: str, temperat
         return None
 
 
+def _synthesize_with_ollama(
+    task_intent: str,
+    model: str = "qwen2.5:7b",
+    temperature: float = 0.1,
+    timeout: float = 90.0,
+) -> str | None:
+    """Call local Ollama server to synthesize capability code using qwen2.5:7b."""
+    import json
+    import re
+    import urllib.request
+
+    prompt = _SYNTHESIS_USER_PROMPT.format(
+        task_intent=task_intent,
+        inputs_description="passed as dict, use inputs.get('key', default) for all access",
+    )
+    payload = {
+        "model": model or "qwen2.5:7b",
+        "prompt": prompt,
+        "system": _SYNTHESIS_SYSTEM_PROMPT,
+        "stream": False,
+        "options": {"temperature": temperature},
+    }
+    req = urllib.request.Request(
+        "http://localhost:11434/api/generate",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            raw = data.get("response", "").strip()
+            matches = re.findall(r"```(?:python)?\s*\n(.*?)\n```", raw, re.DOTALL)
+            code = matches[0] if matches else raw
+            return code.strip()
+    except Exception as e:
+        logger.warning("Ollama synthesis failed: %s", e)
+        return None
+
+
 def _validate_synthesized_code(code: str, expected_function: str = "execute") -> tuple[bool, str]:
     """Validate that synthesized code is syntactically valid and contains the required entrypoint."""
     if not code or not code.strip():
@@ -238,7 +277,21 @@ class CapabilitySynthesizer:
         synthesis_method = "template"
 
         if self.settings.llm_configured:
-            if self.settings.llm_provider == "gemini" and self.settings.gemini_api_key:
+            if self.settings.effective_llm_provider == "ollama":
+                code_body = _synthesize_with_ollama(
+                    task_intent,
+                    model=self.settings.llm_model or "qwen2.5:7b",
+                    temperature=self.settings.llm_synthesis_temperature,
+                )
+                if code_body:
+                    valid, err = _validate_synthesized_code(code_body)
+                    if not valid:
+                        logger.warning("Ollama code invalid (%s), falling back to template", err)
+                        code_body = None
+                    else:
+                        synthesis_method = "ollama"
+
+            elif self.settings.llm_provider == "gemini" and self.settings.gemini_api_key:
                 code_body = _synthesize_with_gemini(
                     task_intent,
                     self.settings.gemini_api_key,

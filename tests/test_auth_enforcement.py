@@ -16,6 +16,10 @@ from capforge.server.auth import AuthManager, AuthStore, UserRole
 
 client = TestClient(app, raise_server_exceptions=False)
 
+@pytest.fixture(autouse=True)
+def ensure_auth_enforced(monkeypatch):
+    monkeypatch.delenv("CAPFORGE_DEV_MODE", raising=False)
+
 
 @pytest.fixture
 def fresh_auth_manager(tmp_path):

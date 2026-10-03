@@ -88,6 +88,13 @@ class EventType(str, enum.Enum):
     SKILL_PROMOTED = "skill_promoted"
     SKILL_REJECTED = "skill_rejected"
     SKILL_ROLLBACK = "skill_rollback"
+    CAPABILITY_GENERATED = "capability_generated"
+    CAPABILITY_VALIDATED = "capability_validated"
+    WORKFLOW_RETRY_STARTED = "workflow_retry_started"
+    WORKFLOW_RETRY_COMPLETED = "workflow_retry_completed"
+    REPORT_COMPILED = "report_compiled"
+    WORKFLOW_STARTED = "workflow_started"
+    WORKFLOW_COMPLETED = "workflow_completed"
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +216,10 @@ class Capability(BaseModel):
     description: str = Field(description="What the capability repeatedly accomplishes")
     domain: str = Field(default="general")
     tags: list[str] = Field(default_factory=list)
+    features: list[str] = Field(
+        default_factory=list,
+        description="Declared functional capabilities/features for dynamic discovery without hardcoding versions",
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -239,6 +250,16 @@ class Capability(BaseModel):
     confidence_score: float = 0.90
     parent_version: str | None = None
     changelog: str = "Initial release"
+
+    def has_feature(self, feature: str) -> bool:
+        """Check if capability supports a specific feature."""
+        target = feature.strip().lower()
+        return any(f.strip().lower() == target for f in self.features)
+
+    def has_features(self, required_features: list[str]) -> bool:
+        """Check if capability supports all requested features."""
+        owned = {f.strip().lower() for f in self.features}
+        return all(req.strip().lower() in owned for req in required_features)
 
     def to_openai_tool(self) -> dict:
         """Export capability as an OpenAI / standard function-calling tool definition."""
@@ -271,6 +292,11 @@ class Capability(BaseModel):
     def to_tool(self) -> dict:
         """Alias for to_openai_tool()."""
         return self.to_openai_tool()
+
+    @property
+    def code(self) -> str:
+        """Convenience property for code_body."""
+        return self.code_body
 
     @classmethod
     def from_function(cls, func, **kwargs):

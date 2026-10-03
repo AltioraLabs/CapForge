@@ -16,7 +16,9 @@ from capforge.core.models import (
     ExecutionRequest,
     ExecutionResponse,
 )
+from capforge.core.schemas import SchemaValidator, generate_schema_from_specs, get_schema_validator
 from capforge.core.telemetry import trace_manager
+from capforge.optimization.profiler import profiler
 from capforge.registry.store import CapabilityRegistry
 from capforge.security.trust_chain import TamperDetectedError, TrustChain
 from capforge.verification.sandbox import SandboxRunner
@@ -36,6 +38,7 @@ class CapabilityExecutor:
         failure_threshold: int = 3,
         auto_rollback_enabled: bool = True,
         enforce_trust: bool = False,
+        schema_validator: SchemaValidator | None = None,
     ):
         self.registry = registry
         self.sandbox = sandbox or SandboxRunner()
@@ -44,6 +47,7 @@ class CapabilityExecutor:
         self.enforce_trust = enforce_trust  # If True, unsigned caps are also blocked
         self.failure_threshold = failure_threshold
         self.auto_rollback_enabled = auto_rollback_enabled
+        self.schema_validator = schema_validator or get_schema_validator()
         self._consecutive_failures: dict[str, int] = {}
 
     def execute(self, request: ExecutionRequest) -> ExecutionResponse:
@@ -61,6 +65,7 @@ class CapabilityExecutor:
             span.set_attribute("execution_time_ms", resp.execution_time_ms)
             if resp.status != "SUCCESS":
                 span.set_attribute("error", resp.error or "")
+            profiler.record_execution(request.capability_id, resp.version, resp.execution_time_ms, resp.status == 'SUCCESS')
             return resp
 
     def _execute_internal(self, request: ExecutionRequest) -> ExecutionResponse:
@@ -115,21 +120,45 @@ class CapabilityExecutor:
                     execution_time_ms=round(elapsed_ms, 2),
                 )
 
-        # 4. Validate required inputs
-        for param_name, param_spec in cap.inputs.items():
-            if param_spec.required and param_name not in request.inputs:
-                if param_spec.default is not None:
-                    request.inputs[param_name] = param_spec.default
-                else:
-                    elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-                    return ExecutionResponse(
-                        capability_id=cap.id,
-                        version=cap.version,
-                        status="FAILED",
-                        output=None,
-                        error=f"Missing required parameter '{param_name}'",
-                        execution_time_ms=round(elapsed_ms, 2),
-                    )
+        # 4. Schema Validation & Input Parameter Coercion (Contract Enforcement)
+        if cap.inputs:
+            cap_schema = generate_schema_from_specs(
+                capability_id=cap.id,
+                version=cap.version,
+                input_specs=cap.inputs,
+                output_specs=cap.outputs,
+            )
+            validator = getattr(self, 'schema_validator', None) or get_schema_validator()
+            is_valid, validated_inputs, input_errors = validator.validate_inputs(
+                cap_schema, request.inputs
+            )
+            if not is_valid:
+                elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                logger.warning("Input schema validation failed for %s: %s", cap.id, input_errors)
+                return ExecutionResponse(
+                    capability_id=cap.id,
+                    version=cap.version,
+                    status="FAILED",
+                    output=None,
+                    error=f"SCHEMA_VALIDATION_ERROR: {'; '.join(input_errors)}",
+                    execution_time_ms=round(elapsed_ms, 2),
+                )
+            request.inputs = validated_inputs
+        else:
+            for param_name, param_spec in cap.inputs.items():
+                if param_spec.required and param_name not in request.inputs:
+                    if param_spec.default is not None:
+                        request.inputs[param_name] = param_spec.default
+                    else:
+                        elapsed_ms = (time.perf_counter() - start_time) * 1000.0
+                        return ExecutionResponse(
+                            capability_id=cap.id,
+                            version=cap.version,
+                            status="FAILED",
+                            output=None,
+                            error=f"Missing required parameter '{param_name}'",
+                            execution_time_ms=round(elapsed_ms, 2),
+                        )
 
         # 4. Execute in Sandbox
         run_res = self.sandbox.execute_code(
@@ -154,6 +183,18 @@ class CapabilityExecutor:
             self._consecutive_failures[cap.id] = 0
             exec_status = "SUCCESS"
             err_msg = None
+            if isinstance(run_res.get("output"), dict) and (cap.inputs or cap.outputs):
+                cap_schema = generate_schema_from_specs(
+                    capability_id=cap.id,
+                    version=cap.version,
+                    input_specs=cap.inputs,
+                    output_specs=cap.outputs,
+                )
+                validator = getattr(self, 'schema_validator', None) or get_schema_validator()
+                _, normalized_output, _ = validator.validate_outputs(
+                    cap_schema, run_res["output"]
+                )
+                run_res["output"] = normalized_output
         else:
             exec_status = "FAILED"
             err_msg = run_res["error"]

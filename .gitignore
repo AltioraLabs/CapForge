@@ -95,3 +95,6 @@ desktop.ini
 # Agent scratch & task artifacts
 scratch/
 .gsd/
+
+# Local SDK testing harness 
+multi_agent_system/

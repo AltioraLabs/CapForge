@@ -6,6 +6,7 @@ or high-risk capabilities, with automatic fallback to isolated subprocess execut
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import shutil
@@ -16,6 +17,18 @@ from typing import Any
 from capforge.verification.sandbox import SandboxRunner
 
 logger = logging.getLogger("capforge.verification.docker")
+
+
+@functools.lru_cache(maxsize=1)
+def docker_available() -> bool:
+    """Cached Docker daemon probe (avoids a ~2s `docker info` on every call)."""
+    if not shutil.which("docker"):
+        return False
+    try:
+        res = subprocess.run(["docker", "info"], capture_output=True, timeout=2.0)
+        return res.returncode == 0
+    except Exception:
+        return False
 
 
 class DockerSandboxRunner(SandboxRunner):
@@ -40,17 +53,7 @@ class DockerSandboxRunner(SandboxRunner):
     def _check_docker(self) -> bool:
         if self.force_subprocess_fallback:
             return False
-        if not shutil.which("docker"):
-            return False
-        try:
-            res = subprocess.run(
-                ["docker", "info"],
-                capture_output=True,
-                timeout=2.0,
-            )
-            return res.returncode == 0
-        except Exception:
-            return False
+        return docker_available()
 
     def is_docker_enabled(self) -> bool:
         return self._docker_available
@@ -77,6 +80,7 @@ class DockerSandboxRunner(SandboxRunner):
             "-i",
             f"--memory={self.memory_limit}",
             f"--cpus={self.cpu_quota}",
+            "--pids-limit=64",
             f"--network={self.network_mode}",
             self.docker_image,
             "python",

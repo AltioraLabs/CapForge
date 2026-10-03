@@ -17,6 +17,8 @@ circular import chain:
   adversarial_tester -> sandbox -> verification/__init__ -> evaluator -> security/__init__
 """
 
+from __future__ import annotations
+
 # Maps public name -> module where it lives
 _LAZY = {
     "CodeGuardian": "capforge.security.code_guardian",

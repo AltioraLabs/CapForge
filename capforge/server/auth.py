@@ -164,12 +164,22 @@ class AuthManager:
         return hashlib.sha256(raw_key.strip().encode("utf-8")).hexdigest()
 
     def _ensure_bootstrap_admin(self) -> None:
-        """Provision the root admin key on first startup if no admin keys exist."""
+        """Provision the root admin key on first startup if no admin keys exist.
+
+        The key comes from CAPFORGE_BOOTSTRAP_ADMIN_KEY when set; otherwise a
+        fresh random key is generated per new database and printed ONCE to the
+        server log (standard initial-admin-secret practice). There is no
+        hardcoded default — a publicly known fallback would give every fresh
+        install the same root credential.
+        """
         all_keys = self._store.list_all()
         has_admin = any(k.role == UserRole.ADMIN and not k.revoked for k in all_keys)
         if not has_admin:
-            # Check if bootstrap key is set via environment
-            bootstrap_key = settings.__dict__.get("_bootstrap_admin_key") or "sf_live_master_admin_secret"
+            bootstrap_key = settings.bootstrap_admin_key
+            generated = False
+            if not bootstrap_key:
+                bootstrap_key = f"sf_live_bootstrap_{secrets.token_urlsafe(32)}"
+                generated = True
             existing = self._store.get_by_id("key_root_admin")
             if not existing:
                 rec = APIKeyRecord(
@@ -180,10 +190,17 @@ class AuthManager:
                     tenant_namespace="*",
                 )
                 self._store.save(rec)
-                logger.warning(
-                    "Bootstrap admin key provisioned (key_root_admin). "
-                    "Rotate this key immediately in production via POST /v1/auth/keys."
-                )
+                if generated:
+                    logger.warning(
+                        "Bootstrap admin key generated for fresh install (shown ONCE): %s "
+                        "Provision CAPFORGE_BOOTSTRAP_ADMIN_KEY and rotate immediately via POST /v1/auth/keys.",
+                        bootstrap_key,
+                    )
+                else:
+                    logger.warning(
+                        "Bootstrap admin key provisioned from CAPFORGE_BOOTSTRAP_ADMIN_KEY. "
+                        "Rotate this key immediately in production via POST /v1/auth/keys."
+                    )
 
     def create_api_key(
         self,

@@ -22,6 +22,11 @@ from capforge.core.models import (
     TestType,
     VerificationResult,
 )
+from capforge.core.telemetry import (
+    GenAISemanticConventions,
+    trace_manager,
+)
+from capforge.verification.formal import formal_verifier
 from capforge.verification.sandbox import SandboxRunner
 
 # TYPE_CHECKING guard prevents circular import at module load time.
@@ -31,6 +36,64 @@ if TYPE_CHECKING:
     from capforge.security.code_guardian import CodeGuardian
 
 logger = logging.getLogger("capforge.evaluator")
+
+
+_SAFE_ASSERT_CALLS = frozenset({
+    "len", "isinstance", "str", "int", "float", "bool", "list", "dict",
+    "abs", "round", "min", "max", "sum", "any", "all",
+})
+
+_SAFE_ASSERT_NODES = (
+    ast.Expression,
+    ast.BoolOp,
+    ast.BinOp,
+    ast.UnaryOp,
+    ast.Compare,
+    ast.Call,
+    ast.Attribute,
+    ast.Subscript,
+    ast.Name,
+    ast.Load,
+    ast.Constant,
+    ast.List,
+    ast.Tuple,
+    ast.Dict,
+)
+
+
+def _assert_expr_is_safe(expression: str) -> tuple[bool, str]:
+    """Statically whitelist an assert expression before eval().
+
+    Allows comparisons, boolean logic, arithmetic, subscripts, and method
+    calls on `output` (e.g. output.get('status') == 'SUCCESS'). Rejects
+    dunder attribute access (blocks __class__/__subclasses__ escapes),
+    arbitrary names, lambdas, comprehensions, and non-whitelisted calls.
+    """
+    try:
+        tree = ast.parse(expression, mode="eval")
+    except SyntaxError as e:
+        return False, f"not valid Python: {e}"
+    # NOTE: ast.boolop is NOT a subclass of ast.operator (sibling ABCs), so all
+    # four operator families are listed explicitly here.
+    allowed_nodes = _SAFE_ASSERT_NODES + (ast.boolop, ast.operator, ast.unaryop, ast.cmpop)
+    allowed_names = frozenset({"output", "True", "False", "None"}) | _SAFE_ASSERT_CALLS
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute):
+            if node.attr.startswith("_"):
+                return False, f"dunder attribute access '{node.attr}' is forbidden"
+        elif isinstance(node, ast.Name):
+            if node.id not in allowed_names:
+                return False, f"unknown name '{node.id}' (only 'output' and safe builtins allowed)"
+        elif isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Name):
+                if func.id not in _SAFE_ASSERT_CALLS:
+                    return False, f"call to '{func.id}' is not whitelisted"
+            elif not isinstance(func, ast.Attribute):
+                return False, "only simple or output-method calls are allowed"
+        elif not isinstance(node, allowed_nodes):
+            return False, f"node type '{type(node).__name__}' is not allowed"
+    return True, ""
 
 
 class CapabilityEvaluator:
@@ -73,6 +136,19 @@ class CapabilityEvaluator:
         prior_versions_tests: list[TestCase] | None = None,
     ) -> VerificationResult:
         """Run complete five-level verification tests against capability in the sandbox."""
+        with trace_manager.start_span("capforge.verification.evaluate") as span:
+            span.set_attribute(GenAISemanticConventions.CAPABILITY_ID, capability.id)
+            span.set_attribute(GenAISemanticConventions.CAPABILITY_VERSION, str(capability.version))
+            span.set_attribute(GenAISemanticConventions.CAPABILITY_STATUS, capability.status.value)
+            res = self._evaluate_internal(capability, prior_versions_tests)
+            span.set_attribute(GenAISemanticConventions.VERIFICATION_PASSED, res.passed)
+            return res
+
+    def _evaluate_internal(
+        self,
+        capability: Capability,
+        prior_versions_tests: list[TestCase] | None = None,
+    ) -> VerificationResult:
         diagnostics_notes: list[str] = []
         level_0_report: dict[str, Any] = {"skipped": True}
 
@@ -249,6 +325,7 @@ class CapabilityEvaluator:
             four_level_report={
                 "level_0_security": level_0_report,
                 "level_1_structural": {"valid": True},
+                "level_1_formal_proof": formal_verifier.verify_invariants(capability).__dict__,
                 "level_2_functional": {"score": round(func_score, 4), "passed": func_passed, "total": func_total},
                 "level_3_generalization": {"score": round(gen_score, 4), "passed": gen_passed, "total": gen_total},
                 "level_4_regression": {"passed": regression_passed, "failed_tests": regression_failed_tests},
@@ -293,8 +370,13 @@ class CapabilityEvaluator:
                 if s not in out_str:
                     return False, f"Output did not contain required substring '{s}'"
 
-        # 3. Dynamic Python assert expression
+        # 3. Dynamic Python assert expression (AST-whitelisted before eval:
+        # no dunder attribute access, so subclass-traversal escapes such as
+        # output.__class__.__base__.__subclasses__() are rejected statically).
         if test.assert_expression:
+            safe, reason = _assert_expr_is_safe(test.assert_expression)
+            if not safe:
+                return False, f"Rejected unsafe assert expression: {reason}"
             eval_scope = {"output": output}
             try:
                 result = eval(

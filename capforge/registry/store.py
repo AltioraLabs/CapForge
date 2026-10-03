@@ -9,6 +9,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from capforge.core.config import settings
 from capforge.core.exceptions import CapabilityNotFoundError
@@ -286,6 +287,32 @@ class CapabilityRegistry:
             )
             conn.commit()
 
+    def get_capabilities_by_feature(
+        self,
+        feature: str,
+        domain: str | None = None,
+        status: CapabilityStatus | None = None,
+        namespace: str | None = None,
+    ) -> list[Capability]:
+        """Discover active capabilities that support a specific feature without version hardcoding."""
+        all_caps = self.list_capabilities(domain=domain, status=status, namespace=namespace)
+        return [c for c in all_caps if c.has_feature(feature)]
+
+    def find_by_features(
+        self,
+        features: list[str],
+        match_all: bool = True,
+        domain: str | None = None,
+        status: CapabilityStatus | None = None,
+        namespace: str | None = None,
+    ) -> list[Capability]:
+        """Discover capabilities matching all (or any) requested feature tags."""
+        all_caps = self.list_capabilities(domain=domain, status=status, namespace=namespace)
+        if match_all:
+            return [c for c in all_caps if c.has_features(features)]
+        req_set = {f.strip().lower() for f in features}
+        return [c for c in all_caps if any(f.strip().lower() in req_set for f in c.features)]
+
     def get_verification_history(self, capability_id: str) -> list[VerificationResult]:
         """Fetch all historical verification run logs for a capability."""
         with self._get_connection() as conn:
@@ -300,3 +327,30 @@ class CapabilityRegistry:
             )
             rows = cursor.fetchall()
             return [VerificationResult.model_validate_json(r["raw_json"]) for r in rows]
+
+# ---------------------------------------------------------------------------
+# Registry Backend and Artifact Store Factories
+# ---------------------------------------------------------------------------
+
+
+def get_registry_store(db_path: Path | str | None = None) -> Any:
+    """Factory to retrieve configured CapabilityRegistry backend (SQLite or PostgreSQL)."""
+    if settings.registry_backend == "postgres" and settings.postgres_url:
+        from capforge.registry.store_postgres import PostgresCapabilityRegistry, PostgresConfig
+        return PostgresCapabilityRegistry(PostgresConfig(connection_string=settings.postgres_url))
+    return CapabilityRegistry(db_path=db_path)
+
+
+def get_artifact_store() -> Any:
+    """Factory to retrieve configured code artifact store (S3 or None for SQLite/local)."""
+    if settings.storage_backend == "s3" and settings.s3_bucket:
+        from capforge.registry.store_s3 import S3ArtifactStore, S3Config
+        return S3ArtifactStore(S3Config(
+            bucket_name=settings.s3_bucket,
+            endpoint_url=settings.s3_endpoint_url,
+            region_name=settings.s3_region,
+            access_key=settings.s3_access_key,
+            secret_key=settings.s3_secret_key,
+            prefix=settings.s3_prefix,
+        ))
+    return None

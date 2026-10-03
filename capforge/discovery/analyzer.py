@@ -25,6 +25,22 @@ class TaskAnalyzer:
     DOMAIN_KEYWORDS = {
         "security": ["vulnerability", "audit", "cve", "auth", "token", "credential", "security", "leak"],
         "data_analysis": ["telemetry", "metrics", "analytics", "anomaly", "timeseries", "dataset", "statistics"],
+        "quantitative_finance": [
+            "var",
+            "value_at_risk",
+            "risk",
+            "drawdown",
+            "volatility",
+            "portfolio",
+            "returns",
+            "expected_shortfall",
+            "cvar",
+            "sharpe",
+            "tail",
+            "shortfall",
+            "monte_carlo",
+        ],
+        "mathematics": ["calculate", "compute", "matrix", "optimization", "regression", "simulation", "percentile"],
         "api_integration": ["api", "rest", "endpoint", "openapi", "graphql", "client", "request", "webhook"],
         "software_engineering": ["dependency", "repository", "git", "github", "build", "package", "refactor"],
     }
@@ -38,6 +54,11 @@ class TaskAnalyzer:
         (r"(telemetry|metrics|timeseries)", "telemetry_processor"),
         (r"(vulnerability|cve|outdated|audit)", "vulnerability_auditor"),
         (r"(git|github|commit|repo)", "git_repository_inspector"),
+        (r"(value_at_risk|var|cvar|expected_shortfall|tail_risk)", "calculate_value_at_risk"),
+        (r"(volatility|std_dev|variance)", "calculate_volatility"),
+        (r"(drawdown|max_drawdown)", "calculate_max_drawdown"),
+        (r"(log_returns|returns_calculator)", "calculate_log_returns"),
+        (r"(monte_carlo|stochastic_simulation)", "monte_carlo_simulator"),
     ]
 
     def analyze(self, task_intent: str) -> DecomposedTask:
@@ -55,7 +76,22 @@ class TaskAnalyzer:
         action_verbs = [
             w
             for w in words
-            if w in {"analyze", "fetch", "extract", "audit", "monitor", "query", "build", "parse", "detect", "validate"}
+            if w in {
+                "analyze",
+                "fetch",
+                "extract",
+                "audit",
+                "monitor",
+                "query",
+                "build",
+                "parse",
+                "detect",
+                "validate",
+                "calculate",
+                "compute",
+                "simulate",
+                "estimate",
+            }
         ]
 
         # 3. Detect target entity or service name (e.g., "QuantumMetrics API", "GitHub")
@@ -67,7 +103,7 @@ class TaskAnalyzer:
         tokens = [
             t
             for t in raw_service.split()
-            if t.lower() not in {"query", "analyze", "fetch", "extract", "get", "audit", "run"}
+            if t.lower() not in {"query", "analyze", "fetch", "extract", "get", "audit", "run", "calculate"}
         ]
         service_name = " ".join(tokens) if tokens else "generic_service"
 
@@ -75,17 +111,26 @@ class TaskAnalyzer:
         primitives: list[str] = []
         for pattern, prim_name in self.PRIMITIVE_RULES:
             if re.search(pattern, text_lower):
-                primitives.append(prim_name)
+                if prim_name not in primitives:
+                    primitives.append(prim_name)
 
-        # Ensure at least general API or execution primitives exist if none matched
+        # 5. Direct identifier detection: If intent looks like an atomic identifier (e.g. calculate_value_at_risk)
+        clean_identifier = re.sub(r"[^a-z0-9_]+", "", text_lower.replace("-", "_"))
+        if "_" in clean_identifier and clean_identifier not in primitives:
+            primitives.append(clean_identifier)
+
+        # Ensure general API or execution primitives exist if none matched
         if not primitives:
-            primitives.append("http_request_handler")
-            primitives.append("response_parser")
-
-        # Specific compound capability target
-        slug = re.sub(r"[^a-z0-9]+", "_", f"{service_name}_{primary_domain}").strip("_").lower()
-        if slug not in primitives:
-            primitives.append(slug)
+            if primary_domain == "api_integration":
+                primitives.append("http_request_handler")
+                primitives.append("response_parser")
+                slug = re.sub(r"[^a-z0-9]+", "_", f"{service_name}_{primary_domain}").strip("_").lower()
+                if slug not in primitives:
+                    primitives.append(slug)
+            else:
+                slug = re.sub(r"[^a-z0-9]+", "_", task_intent).strip("_").lower()
+                if slug not in primitives:
+                    primitives.append(slug)
 
         return DecomposedTask(
             original_task=task_intent,

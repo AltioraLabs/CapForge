@@ -14,6 +14,12 @@ Lifecycle steps tested:
 8. GET /health and /health/ready → platform healthy
 """
 
+from __future__ import annotations
+
+import os
+
+os.environ["CAPFORGE_DEV_MODE"] = "true"  # noqa: E402
+
 from fastapi.testclient import TestClient
 
 from capforge.server.app import app
