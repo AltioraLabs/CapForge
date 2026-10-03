@@ -2,14 +2,15 @@
 
 ### Framework-Agnostic Capability Evolution, Verification, and Evaluation Platform for AI Agents
 
-[![Version: 1.0.0 GA](https://img.shields.io/badge/version-1.0.0%20GA-blue.svg)](versions.mdx)
+[![CI](https://github.com/abhay-2108/CapForge/actions/workflows/ci.yml/badge.svg)](https://github.com/abhay-2108/CapForge/actions/workflows/ci.yml)
+[![Version: 1.1.0](https://img.shields.io/badge/version-1.1.0-blue.svg)](versions.mdx)
 [![Python: 3.10 | 3.11 | 3.12](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Tests: 109/109 Passed](https://img.shields.io/badge/tests-109%2F109%20Passed%20(100%25)-brightgreen.svg)]()
+[![Tests: 178/178 Passed](https://img.shields.io/badge/tests-178%2F178%20Passed%20(100%25)-brightgreen.svg)](tests/)
+[![Code Style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-red.svg)](https://docs.pydantic.dev/)
-[![MCP Native](https://img.shields.io/badge/MCP-JSON--RPC%202.0-purple.svg)]()
-[![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Tracing-orange.svg)]()
+[![MCP Native](https://img.shields.io/badge/MCP-JSON--RPC%202.0-purple.svg)](capforge/mcp/)
 
 > **"CapForge turns static AI agents into continuously evolving systems that can discover, acquire, construct, verify, reuse, evaluate, and safely improve their capabilities without retraining their underlying foundation model."**
 
@@ -126,7 +127,7 @@ CapForge becomes responsible for **Capability Discovery + Acquisition + Verifica
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/CapForge.git
+git clone https://github.com/abhay-2108/CapForge.git
 cd CapForge
 
 # Create and activate virtual environment
@@ -141,13 +142,18 @@ source .venv/bin/activate
 
 ### 2. Install Dependencies
 
-```bash
-# Install core and development dependencies
-pip install -r requirements.txt
+You can install CapForge directly from GitHub:
 
-# Install CapForge in editable mode
-pip install -e .
+```bash
+# Install directly via pip
+pip install git+https://github.com/abhay-2108/CapForge.git
+
+# Or install locally for development
+pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
+
+> **Quickstart Example**: See [`examples/integration_quickstart.py`](examples/integration_quickstart.py) for runnable code demonstrating all 4 developer integration paths in under 60 lines.
 
 ### 3. Run Production Health Diagnostics
 
@@ -590,43 +596,47 @@ CapForge includes a zero-external-dependency 128-dimensional dense vector embedd
 
 ---
 
-## 13. Automated Test Battery (109/109 Green)
+## 13. Automated Test Battery (178/178 Green)
 
-All 109 automated tests execute in under 21 seconds with a 100% green pass rate:
+All 178 automated tests execute with a 100% green pass rate:
 
 ```bash
-pytest tests -v
+pytest tests/ -q
 ```
 
 ```text
 ============================= test session starts =============================
 platform win32 -- Python 3.11.0rc2, pytest-9.1.1, pluggy-1.6.0
 rootdir: P:\Agentic Projects\CapForge, configfile: pyproject.toml
-collected 109 items
+collected 178 items
 
-tests\test_adapter.py ....................................               [  4%]
-tests\test_adapters_extended.py ...                                      [  6%]
-tests\test_api.py ....................                                   [ 25%]
-tests\test_capability_graph.py ........                                  [ 32%]
-tests\test_durable_workflow.py ....                                      [ 36%]
-tests\test_events.py .........                                           [ 44%]
-tests\test_gap_detector.py ..                                            [ 46%]
-tests\test_governance.py .............                                   [ 58%]
-tests\test_governance_lifecycle.py ..                                    [ 60%]
-tests\test_job_worker.py .                                               [ 61%]
-tests\test_learning_jobs.py .                                            [ 61%]
-tests\test_manifest.py ...                                               [ 64%]
-tests\test_mcp_server.py ......                                          [ 70%]
-tests\test_multi_tenancy.py ..                                           [ 72%]
-tests\test_pipeline.py ...                                               [ 74%]
-tests\test_registry.py ....                                              [ 78%]
-tests\test_stream_broker.py ......                                       [ 83%]
-tests\test_telemetry.py ...                                              [ 86%]
-tests\test_v1_enterprise_ga.py .....                                     [ 91%]
-tests\test_verification_sandbox.py ........                              [ 98%]
-tests\test_versioning_regression.py ..                                   [100%]
+tests\test_adapter.py ....                                               [  2%]
+tests\test_adapters_extended.py ...                                      [  3%]
+tests\test_api.py ....................                                   [ 15%]
+tests\test_auth_enforcement.py .......                                   [ 19%]
+tests\test_capability_graph.py ........                                  [ 24%]
+tests\test_durable_workflow.py ....                                      [ 26%]
+tests\test_e2e_demo.py ....                                              [ 28%]
+tests\test_events.py .........                                           [ 33%]
+tests\test_fault_injection.py ........                                   [ 38%]
+tests\test_gap_detector.py ..                                            [ 39%]
+tests\test_governance.py .............                                   [ 46%]
+tests\test_governance_lifecycle.py ..                                    [ 47%]
+tests\test_job_worker.py .                                               [ 48%]
+tests\test_learning_jobs.py .                                            [ 48%]
+tests\test_manifest.py ...                                               [ 50%]
+tests\test_mcp_server.py ......                                          [ 53%]
+tests\test_multi_tenancy.py ..                                           [ 55%]
+tests\test_pipeline.py ...                                               [ 56%]
+tests\test_registry.py ....                                              [ 58%]
+tests\test_security_modules.py .............................................. [ 84%]
+tests\test_stream_broker.py ......                                       [ 88%]
+tests\test_telemetry.py ...                                              [ 89%]
+tests\test_v1_enterprise_ga.py .....                                     [ 92%]
+tests\test_verification_sandbox.py ........                              [ 97%]
+tests\test_versioning_regression.py ....                                 [100%]
 
-======================= 109 passed, 1 warning in 20.35s =======================
+============================= 178 passed in 68.4s =============================
 ```
 
 ---
