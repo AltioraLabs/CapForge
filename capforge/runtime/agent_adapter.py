@@ -9,9 +9,11 @@ Integrates the Event Gateway, Experience Filter, Risk Engine, and Capability Gra
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
+from capforge.acquisition.engine import AcquisitionEngine
 from capforge.core.events import EventGateway, ExperienceFilter
 from capforge.core.governance import CapabilityFirewall, RiskEngine
 from capforge.core.models import (
@@ -23,15 +25,14 @@ from capforge.core.models import (
     ExecutionResponse,
     VerificationResult,
 )
-from capforge.registry.store import CapabilityRegistry
-from capforge.discovery.gap_detector import CapabilityGapDetector
 from capforge.discovery.capability_graph import CapabilityGraph
-from capforge.acquisition.engine import AcquisitionEngine
-from capforge.verification.test_generator import TestGenerator
+from capforge.discovery.gap_detector import CapabilityGapDetector
+from capforge.registry.store import CapabilityRegistry
+from capforge.runtime.executor import CapabilityExecutor
 from capforge.verification.evaluator import CapabilityEvaluator
 from capforge.verification.repair import AutoRepairEngine
+from capforge.verification.test_generator import TestGenerator
 from capforge.versioning.manager import VersionManager
-from capforge.runtime.executor import CapabilityExecutor
 
 logger = logging.getLogger("capforge.agent")
 
@@ -39,19 +40,19 @@ logger = logging.getLogger("capforge.agent")
 class AgentLifecycleTrace(BaseModel):
     task: str
     gap: CapabilityGap
-    acquired_capability: Optional[Capability] = None
-    verification: Optional[VerificationResult] = None
+    acquired_capability: Capability | None = None
+    verification: VerificationResult | None = None
     repair_iterations: int = 0
-    execution_result: Optional[ExecutionResponse] = None
+    execution_result: ExecutionResponse | None = None
     reused_primitives: list[str] = Field(default_factory=list)
-    risk_level: Optional[str] = None
+    risk_level: str | None = None
     firewall_blocked: bool = False
 
 
 class CapForgeAgent:
     """The complete CapForge Capability Lifecycle Controller for AI Agents."""
 
-    def __init__(self, registry: Optional[CapabilityRegistry] = None):
+    def __init__(self, registry: CapabilityRegistry | None = None):
         self.registry = registry or CapabilityRegistry()
         self.gap_detector = CapabilityGapDetector(self.registry)
         self.acquisition_engine = AcquisitionEngine()
@@ -69,20 +70,22 @@ class CapForgeAgent:
     def handle_task(
         self,
         task_intent: str,
-        task_inputs: Dict[str, Any],
-        knowledge_spec: Optional[Dict[str, Any]] = None,
-        agent_id: Optional[str] = None,
-        run_id: Optional[str] = None,
+        task_inputs: dict[str, Any],
+        knowledge_spec: dict[str, Any] | None = None,
+        agent_id: str | None = None,
+        run_id: str | None = None,
     ) -> AgentLifecycleTrace:
         """Execute the full CapForge Capability Lifecycle for an agent task."""
 
         # Emit task_started event
-        self.event_gateway.emit(AgentEvent(
-            event_type=EventType.TASK_STARTED,
-            agent_id=agent_id,
-            run_id=run_id,
-            input_data={"task_intent": task_intent},
-        ))
+        self.event_gateway.emit(
+            AgentEvent(
+                event_type=EventType.TASK_STARTED,
+                agent_id=agent_id,
+                run_id=run_id,
+                input_data={"task_intent": task_intent},
+            )
+        )
 
         trace = AgentLifecycleTrace(
             task=task_intent,
@@ -94,12 +97,14 @@ class CapForgeAgent:
         # Step 1: Capability Gap Resolution
         if trace.gap.gap_detected:
             # Emit gap detection event
-            self.event_gateway.emit(AgentEvent(
-                event_type=EventType.CAPABILITY_GAP_DETECTED,
-                agent_id=agent_id,
-                run_id=run_id,
-                metadata={"missing": trace.gap.missing_primitives},
-            ))
+            self.event_gateway.emit(
+                AgentEvent(
+                    event_type=EventType.CAPABILITY_GAP_DETECTED,
+                    agent_id=agent_id,
+                    run_id=run_id,
+                    metadata={"missing": trace.gap.missing_primitives},
+                )
+            )
 
             # We must acquire and forge a new capability
             spec = knowledge_spec or {
@@ -121,27 +126,29 @@ class CapForgeAgent:
                 risk = self.risk_engine.assess(repaired_cap)
                 trace.risk_level = risk.risk_level.value
 
-                verif, _risk = self.version_manager.promote_to_active(
-                    repaired_cap, skip_risk_check=True
-                )
+                verif, _risk = self.version_manager.promote_to_active(repaired_cap, skip_risk_check=True)
                 target_cap_id = repaired_cap.id
 
                 # Update capability graph
                 self.capability_graph.add_capability(repaired_cap)
 
-                self.event_gateway.emit(AgentEvent(
-                    event_type=EventType.SKILL_PROMOTED,
-                    agent_id=agent_id,
-                    run_id=run_id,
-                    metadata={"capability_id": repaired_cap.id, "version": repaired_cap.version},
-                ))
+                self.event_gateway.emit(
+                    AgentEvent(
+                        event_type=EventType.SKILL_PROMOTED,
+                        agent_id=agent_id,
+                        run_id=run_id,
+                        metadata={"capability_id": repaired_cap.id, "version": repaired_cap.version},
+                    )
+                )
             else:
-                self.event_gateway.emit(AgentEvent(
-                    event_type=EventType.SKILL_REJECTED,
-                    agent_id=agent_id,
-                    run_id=run_id,
-                    metadata={"capability_id": repaired_cap.id, "reason": "verification_failed"},
-                ))
+                self.event_gateway.emit(
+                    AgentEvent(
+                        event_type=EventType.SKILL_REJECTED,
+                        agent_id=agent_id,
+                        run_id=run_id,
+                        metadata={"capability_id": repaired_cap.id, "reason": "verification_failed"},
+                    )
+                )
                 return trace
         else:
             # Direct reuse from Capability Registry
@@ -166,11 +173,13 @@ class CapForgeAgent:
 
             # Emit completion event
             event_type = EventType.TASK_COMPLETED if result.status == "SUCCESS" else EventType.TASK_FAILED
-            self.event_gateway.emit(AgentEvent(
-                event_type=event_type,
-                agent_id=agent_id,
-                run_id=run_id,
-                output_data={"status": result.status},
-            ))
+            self.event_gateway.emit(
+                AgentEvent(
+                    event_type=event_type,
+                    agent_id=agent_id,
+                    run_id=run_id,
+                    output_data={"status": result.status},
+                )
+            )
 
         return trace

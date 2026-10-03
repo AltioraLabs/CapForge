@@ -10,14 +10,15 @@ from __future__ import annotations
 import enum
 import re
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, field_validator
+from datetime import UTC, datetime
+from typing import Any
 
+from pydantic import BaseModel, Field, field_validator
 
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
+
 
 class CapabilityStatus(str, enum.Enum):
     EXPERIMENTAL = "EXPERIMENTAL"
@@ -30,6 +31,7 @@ class CapabilityStatus(str, enum.Enum):
 
 class CapabilityType(str, enum.Enum):
     """Capability Ontology types (discussion.mdx §10)."""
+
     TOOL = "TOOL"
     SKILL = "SKILL"
     WORKFLOW = "WORKFLOW"
@@ -57,6 +59,7 @@ TestType.__test__ = False
 
 class RiskLevel(str, enum.Enum):
     """Risk classification for governance gates (discussion.mdx §26)."""
+
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
@@ -64,6 +67,7 @@ class RiskLevel(str, enum.Enum):
 
 class EventType(str, enum.Enum):
     """Universal Event Model event types (discussion.mdx §9)."""
+
     AGENT_STARTED = "agent_started"
     AGENT_FINISHED = "agent_finished"
     TASK_STARTED = "task_started"
@@ -90,12 +94,13 @@ class EventType(str, enum.Enum):
 # Sub-models
 # ---------------------------------------------------------------------------
 
+
 class ParameterSpec(BaseModel):
     name: str
     type: str  # e.g., "string", "integer", "boolean", "dict", "list"
     description: str = ""
     required: bool = True
-    default: Optional[Any] = None
+    default: Any | None = None
 
 
 class TestCase(BaseModel):
@@ -103,10 +108,10 @@ class TestCase(BaseModel):
     id: str
     name: str
     test_type: TestType = TestType.HAPPY_PATH
-    inputs: Dict[str, Any] = Field(default_factory=dict)
-    expected_output_contains: Optional[List[str]] = None
-    expected_keys: Optional[List[str]] = None
-    assert_expression: Optional[str] = None
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    expected_output_contains: list[str] | None = None
+    expected_keys: list[str] | None = None
+    assert_expression: str | None = None
     max_timeout_sec: float = 10.0
 
 
@@ -116,9 +121,9 @@ class TestResult(BaseModel):
     test_type: TestType
     passed: bool
     execution_time_ms: float
-    output: Optional[Any] = None
-    error_message: Optional[str] = None
-    traceback: Optional[str] = None
+    output: Any | None = None
+    error_message: str | None = None
+    traceback: str | None = None
 
 
 class VerificationResult(BaseModel):
@@ -128,53 +133,56 @@ class VerificationResult(BaseModel):
     tests_run: int
     tests_passed: int
     tests_failed: int
-    test_details: List[TestResult] = Field(default_factory=list)
-    diagnostics: Optional[str] = None
+    test_details: list[TestResult] = Field(default_factory=list)
+    diagnostics: str | None = None
     regression_passed: bool = True
     # Four-Level Evaluation breakdown (discussion.mdx §24)
     structural_valid: bool = True
-    functional_score: float = 1.0       # 0.0 - 1.0 (Level 2)
-    generalization_score: float = 1.0   # 0.0 - 1.0 (Level 3)
-    four_level_report: Dict[str, Any] = Field(default_factory=dict)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    functional_score: float = 1.0  # 0.0 - 1.0 (Level 2)
+    generalization_score: float = 1.0  # 0.0 - 1.0 (Level 3)
+    four_level_report: dict[str, Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class CapabilityDependency(BaseModel):
     capability_id: str
     version_constraint: str = ">=1.0.0"
-    primitive_type: Optional[str] = None  # e.g., "auth", "pagination", "parser"
+    primitive_type: str | None = None  # e.g., "auth", "pagination", "parser"
 
 
 class ToolRequirement(BaseModel):
     name: str
     description: str = ""
-    permissions: List[str] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list)
 
 
 class ToolPermissions(BaseModel):
     """Permission declarations for a capability (discussion.mdx §27)."""
-    filesystem: str = "none"    # "none", "read", "write"
-    network: str = "none"       # "none", "restricted", "full"
-    github: str = "none"        # "none", "read", "write"
-    database: str = "none"      # "none", "read", "write"
-    external_apis: str = "none" # "none", "restricted", "full"
+
+    filesystem: str = "none"  # "none", "read", "write"
+    network: str = "none"  # "none", "restricted", "full"
+    github: str = "none"  # "none", "read", "write"
+    database: str = "none"  # "none", "read", "write"
+    external_apis: str = "none"  # "none", "restricted", "full"
 
 
 class Provenance(BaseModel):
     """Provenance and auditability (discussion.mdx §15)."""
-    source: str = "manual"                        # "manual", "web", "github", "documentation", "experience"
-    source_url: Optional[str] = None
-    retrieval_timestamp: Optional[datetime] = None
-    content_hash: Optional[str] = None
+
+    source: str = "manual"  # "manual", "web", "github", "documentation", "experience"
+    source_url: str | None = None
+    retrieval_timestamp: datetime | None = None
+    content_hash: str | None = None
     evidence_summary: str = ""
-    license_info: Optional[str] = None
-    trust_level: float = 1.0                      # 0.0 = untrusted, 1.0 = fully trusted
-    extraction_method: str = "human"              # "human", "llm_synthesis", "api_spec"
+    license_info: str | None = None
+    trust_level: float = 1.0  # 0.0 = untrusted, 1.0 = fully trusted
+    extraction_method: str = "human"  # "human", "llm_synthesis", "api_spec"
 
 
 # ---------------------------------------------------------------------------
 # Primary Capability Model
 # ---------------------------------------------------------------------------
+
 
 class Capability(BaseModel):
     id: str = Field(description="Unique identifier e.g. 'github_dependency_audit'")
@@ -193,19 +201,20 @@ class Capability(BaseModel):
                 f"Invalid capability ID '{clean}'. Must contain only alphanumeric, underscores, dots, or hyphens."
             )
         return clean
+
     version: str = Field(default="1.0.0")
     namespace: str = Field(default="default", description="Tenant or organizational namespace")
     status: CapabilityStatus = Field(default=CapabilityStatus.EXPERIMENTAL)
     capability_type: CapabilityType = Field(default=CapabilityType.SKILL)
     description: str = Field(description="What the capability repeatedly accomplishes")
     domain: str = Field(default="general")
-    tags: List[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    tags: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Dependencies & Tools
-    dependencies: List[CapabilityDependency] = Field(default_factory=list)
-    tools_required: List[ToolRequirement] = Field(default_factory=list)
+    dependencies: list[CapabilityDependency] = Field(default_factory=list)
+    tools_required: list[ToolRequirement] = Field(default_factory=list)
 
     # Permissions & Risk
     permissions: ToolPermissions = Field(default_factory=ToolPermissions)
@@ -215,20 +224,20 @@ class Capability(BaseModel):
     provenance: Provenance = Field(default_factory=Provenance)
 
     # Interface
-    inputs: Dict[str, ParameterSpec] = Field(default_factory=dict)
-    outputs: Dict[str, ParameterSpec] = Field(default_factory=dict)
+    inputs: dict[str, ParameterSpec] = Field(default_factory=dict)
+    outputs: dict[str, ParameterSpec] = Field(default_factory=dict)
 
     # Executable Procedure
     execution_mode: ExecutionMode = ExecutionMode.CODE
     code_body: str = Field(description="Python source code implementing the capability function")
     entrypoint_function: str = Field(default="execute")
-    prompt_template: Optional[str] = None
+    prompt_template: str | None = None
 
     # Quality & Lifecycle
-    verification_tests: List[TestCase] = Field(default_factory=list)
+    verification_tests: list[TestCase] = Field(default_factory=list)
     success_rate: float = 1.0
     confidence_score: float = 0.90
-    parent_version: Optional[str] = None
+    parent_version: str | None = None
     changelog: str = "Initial release"
 
 
@@ -236,13 +245,14 @@ class Capability(BaseModel):
 # Gap Detection
 # ---------------------------------------------------------------------------
 
+
 class CapabilityGap(BaseModel):
     task_intent: str
     gap_detected: bool
-    missing_primitives: List[str] = Field(default_factory=list)
-    available_primitives: List[str] = Field(default_factory=list)
+    missing_primitives: list[str] = Field(default_factory=list)
+    available_primitives: list[str] = Field(default_factory=list)
     confidence: float = 1.0
-    suggested_acquisition_sources: List[str] = Field(default_factory=list)
+    suggested_acquisition_sources: list[str] = Field(default_factory=list)
     rationale: str = ""
 
 
@@ -250,51 +260,54 @@ class CapabilityGap(BaseModel):
 # Execution
 # ---------------------------------------------------------------------------
 
+
 class ExecutionRequest(BaseModel):
     capability_id: str
-    version: Optional[str] = None  # None selects latest ACTIVE version
-    inputs: Dict[str, Any] = Field(default_factory=dict)
+    version: str | None = None  # None selects latest ACTIVE version
+    inputs: dict[str, Any] = Field(default_factory=dict)
     timeout_sec: float = 30.0
-    agent_id: Optional[str] = None
-    run_id: Optional[str] = None
-    allowed_namespaces: Optional[List[str]] = Field(default=None, description="Allowed tenant namespaces")
+    agent_id: str | None = None
+    run_id: str | None = None
+    allowed_namespaces: list[str] | None = Field(default=None, description="Allowed tenant namespaces")
 
 
 class ExecutionResponse(BaseModel):
     capability_id: str
     version: str
     status: str  # "SUCCESS" | "FAILED" | "BLOCKED"
-    output: Optional[Any] = None
-    error: Optional[str] = None
+    output: Any | None = None
+    error: str | None = None
     execution_time_ms: float
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # ---------------------------------------------------------------------------
 # Universal Event Model (discussion.mdx §9)
 # ---------------------------------------------------------------------------
 
+
 class AgentEvent(BaseModel):
     """Normalized agent event for the Event Gateway."""
+
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: EventType
-    run_id: Optional[str] = None
-    task_id: Optional[str] = None
-    agent_id: Optional[str] = None
+    run_id: str | None = None
+    task_id: str | None = None
+    agent_id: str | None = None
     framework: str = "unknown"  # e.g., "langgraph", "openai", "crewai", "custom"
 
     # Tool context (for tool_* events)
-    tool_name: Optional[str] = None
-    tool_version: Optional[str] = None
+    tool_name: str | None = None
+    tool_version: str | None = None
 
     # Input/Output
-    input_data: Optional[Dict[str, Any]] = None
-    output_data: Optional[Any] = None
+    input_data: dict[str, Any] | None = None
+    output_data: Any | None = None
 
     # Error context
-    error_type: Optional[str] = None
-    error_message: Optional[str] = None
+    error_type: str | None = None
+    error_message: str | None = None
 
     # Metadata
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = Field(default_factory=dict)

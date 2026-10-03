@@ -90,6 +90,7 @@ _LAZY_IMPORTS = {
 def __getattr__(name: str):
     if name in _LAZY_IMPORTS:
         import importlib
+
         module = importlib.import_module(_LAZY_IMPORTS[name])
         obj = getattr(module, name)
         # Cache in module globals for subsequent accesses
@@ -100,9 +101,62 @@ def __getattr__(name: str):
 
 __all__ = [
     # Core models (eagerly imported)
-    "AgentEvent", "Capability", "CapabilityGap", "CapabilityStatus", "CapabilityType",
-    "EventType", "ExecutionRequest", "ExecutionResponse", "Provenance", "RiskLevel",
-    "TestCase", "TestType", "ToolPermissions", "VerificationResult",
-    # Lazily imported
-    *_LAZY_IMPORTS.keys(),
+    "AgentEvent",
+    "Capability",
+    "CapabilityDependency",
+    "CapabilityGap",
+    "CapabilityStatus",
+    "CapabilityType",
+    "EventType",
+    "ExecutionMode",
+    "ExecutionRequest",
+    "ExecutionResponse",
+    "ParameterSpec",
+    "Provenance",
+    "RiskLevel",
+    "TestCase",
+    "TestResult",
+    "TestType",
+    "ToolPermissions",
+    "VerificationResult",
+    # Lazily imported components
+    "AcquisitionJobWorker",
+    "AdversarialTester",
+    "AutonomousAcquisitionEngine",
+    "AutonomousAcquisitionPipeline",
+    "CapabilityEvaluator",
+    "CapabilityExecutor",
+    "CapabilityFirewall",
+    "CapabilityGapDetector",
+    "CapabilityGraph",
+    "CapabilityMatcher",
+    "CapabilityRepairLoop",
+    "CapabilitySynthesizer",
+    "CapForgeMCPServer",
+    "CodeGuardian",
+    "CompositeCapabilityExecutor",
+    "CrewAIAgentAdapter",
+    "DockerSandbox",
+    "DurableWorkflowEngine",
+    "EventGateway",
+    "ExecutionPipeline",
+    "ExperienceFilter",
+    "FirewallDecision",
+    "InProcessSandbox",
+    "LangGraphAdapter",
+    "OpenAIAgentAdapter",
+    "RegressionSuiteRunner",
+    "RiskAssessment",
+    "RiskEngine",
+    "SemanticCapabilitySearch",
+    "StandardAgentAdapter",
+    "StreamBroker",
+    "SubprocessSandbox",
+    "TaskAnalyzer",
+    "TestGenerator",
+    "TrustChain",
+    "VectorStore",
+    "VersionManager",
+    "settings",
+    "setup_logging",
 ]

@@ -6,10 +6,10 @@ synthesizing candidate capabilities, and packaging them for validation.
 
 from __future__ import annotations
 
-import json
-from typing import Any, Dict, Optional
-from capforge.core.models import Capability, CapabilityGap
+from typing import Any
+
 from capforge.acquisition.synthesizer import CapabilitySynthesizer
+from capforge.core.models import Capability, CapabilityGap
 
 
 class AcquisitionEngine:
@@ -18,11 +18,7 @@ class AcquisitionEngine:
     def __init__(self):
         self.synthesizer = CapabilitySynthesizer()
 
-    def acquire_from_spec(
-        self,
-        spec: Dict[str, Any],
-        gap: Optional[CapabilityGap] = None
-    ) -> Capability:
+    def acquire_from_spec(self, spec: dict[str, Any], gap: CapabilityGap | None = None) -> Capability:
         """Construct a candidate capability from an API specification dictionary."""
         service_name = spec.get("name", "Unknown Service")
         cap_id = spec.get("id") or service_name.lower().replace(" ", "_")
@@ -42,5 +38,5 @@ class AcquisitionEngine:
             endpoints=endpoints,
             auth_type=auth_type,
             tags=spec.get("tags"),
-            code_override=code_override
+            code_override=code_override,
         )

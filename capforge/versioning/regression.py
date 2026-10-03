@@ -6,9 +6,8 @@ validates that new capability versions do NOT regress on historical test suites.
 
 from __future__ import annotations
 
-from typing import List, Tuple
-from capforge.core.models import Capability, TestCase
 from capforge.core.exceptions import RegressionDetectedError
+from capforge.core.models import Capability, TestCase
 from capforge.registry.store import CapabilityRegistry
 from capforge.verification.evaluator import CapabilityEvaluator
 
@@ -20,12 +19,9 @@ class RegressionSuiteRunner:
         self.registry = registry
         self.evaluator = evaluator or CapabilityEvaluator()
 
-    def run_regression_battery(
-        self,
-        candidate_capability: Capability
-    ) -> Tuple[bool, List[str]]:
+    def run_regression_battery(self, candidate_capability: Capability) -> tuple[bool, list[str]]:
         """Run all test cases from prior versions of this capability against the candidate.
-        
+
         Returns (all_passed, list_of_failed_test_ids).
         """
         all_versions = self.registry.list_versions(candidate_capability.id)
@@ -33,7 +29,7 @@ class RegressionSuiteRunner:
             # First version ever, no regressions possible
             return True, []
 
-        historical_tests: List[TestCase] = []
+        historical_tests: list[TestCase] = []
         seen_test_ids = {t.id for t in candidate_capability.verification_tests}
 
         for past_cap in all_versions:
@@ -62,7 +58,5 @@ class RegressionSuiteRunner:
         if not passed:
             first_fail = failed_tests[0] if failed_tests else "unknown"
             raise RegressionDetectedError(
-                capability_id=candidate_capability.id,
-                broken_version=candidate_capability.version,
-                test_id=first_fail
+                capability_id=candidate_capability.id, broken_version=candidate_capability.version, test_id=first_fail
             )

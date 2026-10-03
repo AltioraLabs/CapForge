@@ -51,20 +51,19 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import logging
 import os
-import sqlite3
 import secrets
+import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from capforge.core.models import Capability
-    from capforge.verification.evaluator import CapabilityEvaluator
     from capforge.registry.store import CapabilityRegistry
+    from capforge.verification.evaluator import CapabilityEvaluator
 
 logger = logging.getLogger("capforge.security.trust_chain")
 
@@ -103,17 +102,19 @@ class PromotionBlockedError(Exception):
 @dataclass
 class CodeSignature:
     """Persisted signature for a capability's code body."""
+
     capability_id: str
     version: str
-    code_sha256: str       # SHA-256 of the code body
-    hmac_sig: str          # HMAC-SHA256(code_sha256, signing_key)
-    signed_at: str         # ISO-8601 UTC timestamp
+    code_sha256: str  # SHA-256 of the code body
+    hmac_sig: str  # HMAC-SHA256(code_sha256, signing_key)
+    signed_at: str  # ISO-8601 UTC timestamp
     signer_version: str = "1"  # Protocol version for future key rotation
 
 
 @dataclass
 class PromotionGateReport:
     """Result of the promotion integrity gate."""
+
     capability_id: str
     version: str
     approved: bool
@@ -137,7 +138,7 @@ class SignatureStore:
     makes it harder for a single DB compromise to affect both code and signatures.
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Path | None = None):
         if db_path is None:
             data_dir = os.environ.get("CAPFORGE_DATA_DIR", "./data")
             db_path = Path(data_dir) / "capforge_trust.db"
@@ -175,26 +176,35 @@ class SignatureStore:
 
     def save(self, sig: CodeSignature) -> None:
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO code_signatures
                     (capability_id, version, code_sha256, hmac_sig, signed_at, signer_version)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (sig.capability_id, sig.version, sig.code_sha256,
-                  sig.hmac_sig, sig.signed_at, sig.signer_version))
+            """,
+                (sig.capability_id, sig.version, sig.code_sha256, sig.hmac_sig, sig.signed_at, sig.signer_version),
+            )
             conn.commit()
 
-    def get(self, capability_id: str, version: str) -> Optional[CodeSignature]:
+    def get(self, capability_id: str, version: str) -> CodeSignature | None:
         with sqlite3.connect(self.db_path) as conn:
-            row = conn.execute("""
+            row = conn.execute(
+                """
                 SELECT capability_id, version, code_sha256, hmac_sig, signed_at, signer_version
                 FROM code_signatures
                 WHERE capability_id = ? AND version = ?
-            """, (capability_id, version)).fetchone()
+            """,
+                (capability_id, version),
+            ).fetchone()
         if not row:
             return None
         return CodeSignature(
-            capability_id=row[0], version=row[1], code_sha256=row[2],
-            hmac_sig=row[3], signed_at=row[4], signer_version=row[5],
+            capability_id=row[0],
+            version=row[1],
+            code_sha256=row[2],
+            hmac_sig=row[3],
+            signed_at=row[4],
+            signer_version=row[5],
         )
 
     def exists(self, capability_id: str, version: str) -> bool:
@@ -202,27 +212,44 @@ class SignatureStore:
 
     def log_promotion(self, report: PromotionGateReport) -> None:
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO promotion_audit
                     (capability_id, version, approved, reason,
                      quorum_passed, quorum_required, evaluated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (report.capability_id, report.version,
-                  1 if report.approved else 0, report.reason,
-                  report.quorum_passed, report.quorum_required,
-                  datetime.now(timezone.utc).isoformat()))
+            """,
+                (
+                    report.capability_id,
+                    report.version,
+                    1 if report.approved else 0,
+                    report.reason,
+                    report.quorum_passed,
+                    report.quorum_required,
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
             conn.commit()
 
-    def get_promotion_history(self, capability_id: str) -> List[Dict]:
+    def get_promotion_history(self, capability_id: str) -> list[dict]:
         with sqlite3.connect(self.db_path) as conn:
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT version, approved, reason, quorum_passed, quorum_required, evaluated_at
                 FROM promotion_audit WHERE capability_id = ?
                 ORDER BY evaluated_at DESC
-            """, (capability_id,)).fetchall()
+            """,
+                (capability_id,),
+            ).fetchall()
         return [
-            {"version": r[0], "approved": bool(r[1]), "reason": r[2],
-             "quorum_passed": r[3], "quorum_required": r[4], "evaluated_at": r[5]}
+            {
+                "version": r[0],
+                "approved": bool(r[1]),
+                "reason": r[2],
+                "quorum_passed": r[3],
+                "quorum_required": r[4],
+                "evaluated_at": r[5],
+            }
             for r in rows
         ]
 
@@ -247,8 +274,8 @@ class TrustChain:
 
     def __init__(
         self,
-        signing_key: Optional[str] = None,
-        db_path: Optional[Path] = None,
+        signing_key: str | None = None,
+        db_path: Path | None = None,
         quorum_runs: int = 2,
         block_on_tamper: bool = True,
     ):
@@ -257,7 +284,7 @@ class TrustChain:
         self.block_on_tamper = block_on_tamper
         self._signing_key = self._load_signing_key(signing_key)
 
-    def _load_signing_key(self, explicit_key: Optional[str]) -> bytes:
+    def _load_signing_key(self, explicit_key: str | None) -> bytes:
         if explicit_key:
             return explicit_key.encode("utf-8")
         env_key = os.environ.get("CAPFORGE_SIGNING_KEY")
@@ -276,7 +303,7 @@ class TrustChain:
     # Guarantee 1: Sign at registration
     # -----------------------------------------------------------------------
 
-    def sign(self, capability: "Capability") -> CodeSignature:
+    def sign(self, capability: Capability) -> CodeSignature:
         """Sign a capability's code body at registration time.
 
         Returns the CodeSignature and persists it to the trust database.
@@ -294,12 +321,14 @@ class TrustChain:
             version=str(capability.version),
             code_sha256=code_sha256,
             hmac_sig=hmac_sig,
-            signed_at=datetime.now(timezone.utc).isoformat(),
+            signed_at=datetime.now(UTC).isoformat(),
         )
         self._store.save(sig)
         logger.info(
             "TrustChain: signed capability '%s' v%s (sha256=%s...)",
-            capability.id, capability.version, code_sha256[:16],
+            capability.id,
+            capability.version,
+            code_sha256[:16],
         )
         return sig
 
@@ -307,7 +336,7 @@ class TrustChain:
     # Guarantee 2: Verify at execution
     # -----------------------------------------------------------------------
 
-    def verify(self, capability: "Capability") -> bool:
+    def verify(self, capability: Capability) -> bool:
         """Verify that stored code matches its signature.
 
         This is called by the executor BEFORE every execution.
@@ -318,7 +347,8 @@ class TrustChain:
         if not stored:
             logger.warning(
                 "TrustChain: no signature found for capability '%s' v%s — unsigned",
-                capability.id, capability.version,
+                capability.id,
+                capability.version,
             )
             # Unsigned capabilities are allowed (backwards compatible)
             # but cannot be in ACTIVE status — enforcement is in the promotion gate
@@ -331,10 +361,11 @@ class TrustChain:
 
         if not code_matches:
             logger.error(
-                "TrustChain: TAMPER DETECTED for capability '%s' v%s! "
-                "Stored sha256=%s... Current sha256=%s...",
-                capability.id, capability.version,
-                stored.code_sha256[:16], current_sha256[:16],
+                "TrustChain: TAMPER DETECTED for capability '%s' v%s! Stored sha256=%s... Current sha256=%s...",
+                capability.id,
+                capability.version,
+                stored.code_sha256[:16],
+                current_sha256[:16],
             )
             if self.block_on_tamper:
                 raise TamperDetectedError(capability.id, str(capability.version))
@@ -350,9 +381,9 @@ class TrustChain:
         hmac_valid = hmac.compare_digest(stored.hmac_sig, expected_hmac)
         if not hmac_valid:
             logger.error(
-                "TrustChain: HMAC INVALID for capability '%s' v%s — "
-                "signature store may have been compromised",
-                capability.id, capability.version,
+                "TrustChain: HMAC INVALID for capability '%s' v%s — signature store may have been compromised",
+                capability.id,
+                capability.version,
             )
             if self.block_on_tamper:
                 raise TamperDetectedError(capability.id, str(capability.version))
@@ -366,9 +397,9 @@ class TrustChain:
 
     def promotion_gate(
         self,
-        capability: "Capability",
-        evaluator: "CapabilityEvaluator",
-        registry: "CapabilityRegistry",
+        capability: Capability,
+        evaluator: CapabilityEvaluator,
+        registry: CapabilityRegistry,
         prior_version_tests=None,
     ) -> PromotionGateReport:
         """Re-verify a capability from scratch before promoting to ACTIVE.
@@ -396,8 +427,7 @@ class TrustChain:
                 capability_id=capability.id,
                 version=str(capability.version),
                 approved=False,
-                reason="TAMPER_DETECTED: Code signature verification failed. "
-                       "Registry may have been compromised.",
+                reason="TAMPER_DETECTED: Code signature verification failed. Registry may have been compromised.",
                 signature_valid=False,
                 quorum_runs=0,
                 quorum_required=self.quorum_runs,
@@ -420,13 +450,17 @@ class TrustChain:
                     passes += 1
                     logger.debug(
                         "TrustChain promotion gate: run %d/%d PASSED for '%s'",
-                        run_index + 1, self.quorum_runs, capability.id,
+                        run_index + 1,
+                        self.quorum_runs,
+                        capability.id,
                     )
                 else:
                     failures.append(f"Run {run_index + 1}: {result.diagnostics[:200]}")
                     logger.warning(
                         "TrustChain promotion gate: run %d/%d FAILED for '%s': %s",
-                        run_index + 1, self.quorum_runs, capability.id,
+                        run_index + 1,
+                        self.quorum_runs,
+                        capability.id,
                         result.diagnostics[:200],
                     )
             except Exception as e:
@@ -436,8 +470,7 @@ class TrustChain:
 
         if quorum_achieved:
             reason = (
-                f"APPROVED: Signature valid, {passes}/{self.quorum_runs} verification "
-                "runs passed (quorum achieved)."
+                f"APPROVED: Signature valid, {passes}/{self.quorum_runs} verification runs passed (quorum achieved)."
             )
             approved = True
         else:
@@ -462,7 +495,9 @@ class TrustChain:
         self._store.log_promotion(report)
         logger.info(
             "TrustChain promotion gate for '%s' v%s: %s",
-            capability.id, capability.version, "APPROVED" if approved else "REJECTED",
+            capability.id,
+            capability.version,
+            "APPROVED" if approved else "REJECTED",
         )
         return report
 
@@ -470,7 +505,7 @@ class TrustChain:
     # Key Rotation (Operational)
     # -----------------------------------------------------------------------
 
-    def re_sign_all(self, capabilities: List["Capability"]) -> Dict[str, bool]:
+    def re_sign_all(self, capabilities: list[Capability]) -> dict[str, bool]:
         """Re-sign all capabilities with the current signing key.
 
         Call this after rotating CAPFORGE_SIGNING_KEY.
@@ -486,7 +521,7 @@ class TrustChain:
                 results[cap.id] = False
         return results
 
-    def get_signature(self, capability_id: str, version: str) -> Optional[Dict]:
+    def get_signature(self, capability_id: str, version: str) -> dict | None:
         """Retrieve signature metadata for a capability (without the HMAC value)."""
         sig = self._store.get(capability_id, version)
         if not sig:
@@ -500,7 +535,7 @@ class TrustChain:
             # NEVER expose hmac_sig — it's internal
         }
 
-    def get_promotion_history(self, capability_id: str) -> List[Dict]:
+    def get_promotion_history(self, capability_id: str) -> list[dict]:
         """Get the full promotion audit history for a capability."""
         return self._store.get_promotion_history(capability_id)
 
@@ -509,7 +544,7 @@ class TrustChain:
 # Global singleton (optional — wire into app via DI)
 # ---------------------------------------------------------------------------
 
-_trust_chain: Optional[TrustChain] = None
+_trust_chain: TrustChain | None = None
 
 
 def get_trust_chain() -> TrustChain:

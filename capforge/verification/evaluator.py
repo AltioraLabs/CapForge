@@ -13,7 +13,8 @@ from __future__ import annotations
 
 import ast
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
+
 from capforge.core.models import (
     Capability,
     TestCase,
@@ -28,7 +29,6 @@ from capforge.verification.sandbox import SandboxRunner
 #   adversarial_tester -> sandbox -> verification/__init__ -> evaluator -> adversarial_tester
 if TYPE_CHECKING:
     from capforge.security.code_guardian import CodeGuardian
-    from capforge.security.adversarial_tester import AdversarialTester
 
 logger = logging.getLogger("capforge.evaluator")
 
@@ -56,11 +56,13 @@ class CapabilityEvaluator:
         # Late imports here to avoid circular import at module load time
         if enable_security_gate or guardian is not None:
             from capforge.security.code_guardian import CodeGuardian as _CG
+
             self._guardian = guardian or _CG(block_on_critical=True, block_on_high=False)
         else:
             self._guardian = None
         if enable_adversarial:
             from capforge.security.adversarial_tester import AdversarialTester as _AT
+
             self._adversarial = _AT(sandbox=self.sandbox)
         else:
             self._adversarial = None
@@ -68,11 +70,11 @@ class CapabilityEvaluator:
     def evaluate(
         self,
         capability: Capability,
-        prior_versions_tests: Optional[List[TestCase]] = None,
+        prior_versions_tests: list[TestCase] | None = None,
     ) -> VerificationResult:
         """Run complete five-level verification tests against capability in the sandbox."""
-        diagnostics_notes: List[str] = []
-        level_0_report: Dict[str, Any] = {"skipped": True}
+        diagnostics_notes: list[str] = []
+        level_0_report: dict[str, Any] = {"skipped": True}
 
         # -------------------------------------------------------------------
         # Level 0: Security Gate (CodeGuardian)
@@ -83,7 +85,8 @@ class CapabilityEvaluator:
             if scan.blocked:
                 logger.warning(
                     "L0 Security Gate BLOCKED capability '%s': %s",
-                    capability.id, scan.summary,
+                    capability.id,
+                    scan.summary,
                 )
                 return VerificationResult(
                     capability_id=capability.id,
@@ -135,12 +138,16 @@ class CapabilityEvaluator:
         # -------------------------------------------------------------------
         # Level 2 & Level 3: Functional & Generalization Evaluation
         # -------------------------------------------------------------------
-        test_results: List[TestResult] = []
+        test_results: list[TestResult] = []
         tests_passed = 0
         tests_failed = 0
 
-        functional_tests = [t for t in capability.verification_tests if t.test_type in (TestType.SMOKE, TestType.INVARIANT)]
-        generalization_tests = [t for t in capability.verification_tests if t.test_type in (TestType.EDGE_CASE, TestType.PROPERTY)]
+        functional_tests = [
+            t for t in capability.verification_tests if t.test_type in (TestType.SMOKE, TestType.INVARIANT)
+        ]
+        generalization_tests = [
+            t for t in capability.verification_tests if t.test_type in (TestType.EDGE_CASE, TestType.PROPERTY)
+        ]
 
         # If no specific split, treat all as functional
         if not functional_tests and not generalization_tests:
@@ -177,15 +184,17 @@ class CapabilityEvaluator:
                 tests_failed += 1
                 diagnostics_notes.append(f"Test '{test.id}' ({test.test_type.value}) failed: {error_msg}")
 
-            test_results.append(TestResult(
-                test_id=test.id,
-                test_type=test.test_type,
-                passed=passed,
-                execution_time_ms=run_res["execution_time_ms"],
-                output=output,
-                error_message=error_msg,
-                traceback=tb,
-            ))
+            test_results.append(
+                TestResult(
+                    test_id=test.id,
+                    test_type=test.test_type,
+                    passed=passed,
+                    execution_time_ms=run_res["execution_time_ms"],
+                    output=output,
+                    error_message=error_msg,
+                    traceback=tb,
+                )
+            )
 
         func_total = len(functional_tests)
         gen_total = len(generalization_tests)
@@ -217,8 +226,12 @@ class CapabilityEvaluator:
             if not regression_passed:
                 diagnostics_notes.append(f"Level 4 (Regression) failed on historical tests: {regression_failed_tests}")
 
-        all_passed = (tests_failed == 0 and len(capability.verification_tests) > 0 and regression_passed)
-        diagnostics = "\n".join(diagnostics_notes) if diagnostics_notes else "All five-level verification tests passed successfully."
+        all_passed = tests_failed == 0 and len(capability.verification_tests) > 0 and regression_passed
+        diagnostics = (
+            "\n".join(diagnostics_notes)
+            if diagnostics_notes
+            else "All five-level verification tests passed successfully."
+        )
 
         return VerificationResult(
             capability_id=capability.id,
@@ -242,7 +255,7 @@ class CapabilityEvaluator:
             },
         )
 
-    def _validate_structure(self, capability: Capability) -> tuple[bool, Optional[str]]:
+    def _validate_structure(self, capability: Capability) -> tuple[bool, str | None]:
         """Level 1 Structural Validation: check AST syntax, entrypoint, and schema."""
         if not capability.code_body or not capability.code_body.strip():
             return False, "Empty code body"

@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import logging
 import traceback
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 from capforge.adapter.base import BaseAgentAdapter
 from capforge.core.models import (
@@ -31,8 +32,8 @@ class StandardAgentAdapter(BaseAgentAdapter):
     def __init__(
         self,
         agent_id: str = "default_agent",
-        capforge_agent: Optional[CapForgeAgent] = None,
-        registry: Optional[CapabilityRegistry] = None,
+        capforge_agent: CapForgeAgent | None = None,
+        registry: CapabilityRegistry | None = None,
     ):
         self.agent_id = agent_id
         if capforge_agent is not None:
@@ -42,21 +43,21 @@ class StandardAgentAdapter(BaseAgentAdapter):
         else:
             self.sf = CapForgeAgent()
         self.registry = self.sf.registry
-        self._local_tools: Dict[str, Callable] = {}
-        self._captured_events: List[AgentEvent] = []
+        self._local_tools: dict[str, Callable] = {}
+        self._captured_events: list[AgentEvent] = []
 
     def register_local_tool(self, name: str, func: Callable, description: str = "") -> None:
         """Register a native Python tool known to the host agent."""
         self._local_tools[name] = func
 
-    def discover_tools(self) -> List[ToolRequirement]:
+    def discover_tools(self) -> list[ToolRequirement]:
         """Return all local tools known to the host agent."""
         return [
             ToolRequirement(name=name, description=getattr(func, "__doc__", "") or "")
             for name, func in self._local_tools.items()
         ]
 
-    def capture_events(self) -> List[AgentEvent]:
+    def capture_events(self) -> list[AgentEvent]:
         """Drain and return all locally queued events."""
         events = list(self._captured_events)
         self._captured_events.clear()
@@ -70,7 +71,7 @@ class StandardAgentAdapter(BaseAgentAdapter):
             return raw_input.get("task") or raw_input.get("prompt") or str(raw_input)
         return str(raw_input)
 
-    def extract_tool_call(self, raw_call: Any) -> Dict[str, Any]:
+    def extract_tool_call(self, raw_call: Any) -> dict[str, Any]:
         """Normalize tool call payload."""
         if isinstance(raw_call, dict):
             return {
@@ -94,7 +95,7 @@ class StandardAgentAdapter(BaseAgentAdapter):
         self.sf.event_gateway.emit(event)
         return event
 
-    def invoke_skill(self, capability_id: str, inputs: Dict[str, Any]) -> ExecutionResponse:
+    def invoke_skill(self, capability_id: str, inputs: dict[str, Any]) -> ExecutionResponse:
         """Execute a verified CapForge capability inside the sandbox."""
         req = ExecutionRequest(
             capability_id=capability_id,
@@ -105,6 +106,7 @@ class StandardAgentAdapter(BaseAgentAdapter):
 
     def inject_capability(self, capability: Capability) -> Callable:
         """Create a callable Python function wrapper for a verified capability."""
+
         def tool_fn(**kwargs):
             res = self.invoke_skill(capability.id, kwargs)
             if res.status != "SUCCESS":
@@ -120,8 +122,8 @@ class StandardAgentAdapter(BaseAgentAdapter):
     def run_task_with_evolution(
         self,
         task_intent: str,
-        inputs: Dict[str, Any],
-        knowledge_spec: Optional[Dict[str, Any]] = None,
+        inputs: dict[str, Any],
+        knowledge_spec: dict[str, Any] | None = None,
     ) -> ExecutionResponse:
         """Convenience helper: execute task, triggering autonomous acquisition if missing."""
         trace = self.sf.handle_task(

@@ -10,14 +10,14 @@ from __future__ import annotations
 import json
 import logging
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from capforge.core.models import CapabilityStatus, ExecutionRequest
-from capforge.core.manifest import capability_to_yaml
-from capforge.registry.store import CapabilityRegistry
-from capforge.registry.search import CapabilityMatcher
-from capforge.runtime.executor import CapabilityExecutor
 from capforge.acquisition.synthesizer import CapabilitySynthesizer
+from capforge.core.manifest import capability_to_yaml
+from capforge.core.models import CapabilityStatus, ExecutionRequest
+from capforge.registry.search import CapabilityMatcher
+from capforge.registry.store import CapabilityRegistry
+from capforge.runtime.executor import CapabilityExecutor
 
 logger = logging.getLogger("capforge.mcp")
 
@@ -31,16 +31,16 @@ class CapForgeMCPServer:
 
     def __init__(
         self,
-        registry: Optional[CapabilityRegistry] = None,
-        executor: Optional[CapabilityExecutor] = None,
-        synthesizer: Optional[CapabilitySynthesizer] = None,
+        registry: CapabilityRegistry | None = None,
+        executor: CapabilityExecutor | None = None,
+        synthesizer: CapabilitySynthesizer | None = None,
     ):
         self.registry = registry or CapabilityRegistry()
         self.executor = executor or CapabilityExecutor(registry=self.registry)
         self.synthesizer = synthesizer or CapabilitySynthesizer()
         self.matcher = CapabilityMatcher(self.registry)
 
-    def get_tool_definitions(self) -> List[Dict[str, Any]]:
+    def get_tool_definitions(self) -> list[dict[str, Any]]:
         """Return MCP standard tool declarations."""
         return [
             {
@@ -136,7 +136,7 @@ class CapForgeMCPServer:
             },
         ]
 
-    def handle_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_message(self, message: dict[str, Any]) -> dict[str, Any]:
         """Handle a single JSON-RPC 2.0 message."""
         msg_id = message.get("id")
         method = message.get("method")
@@ -200,7 +200,7 @@ class CapForgeMCPServer:
         else:
             return self._error_response(msg_id, -32601, f"Method not found: '{method}'")
 
-    def _execute_tool(self, name: str, args: Dict[str, Any]) -> Any:
+    def _execute_tool(self, name: str, args: dict[str, Any]) -> Any:
         """Route and execute an MCP tool call."""
         if name == "capforge_search_capabilities":
             query = args.get("query", "")
@@ -277,7 +277,7 @@ class CapForgeMCPServer:
         else:
             raise ValueError(f"Unknown MCP tool '{name}'")
 
-    def _error_response(self, msg_id: Any, code: int, message: str) -> Dict[str, Any]:
+    def _error_response(self, msg_id: Any, code: int, message: str) -> dict[str, Any]:
         return {
             "jsonrpc": "2.0",
             "id": msg_id,

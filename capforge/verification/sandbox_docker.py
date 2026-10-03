@@ -11,7 +11,7 @@ import logging
 import shutil
 import subprocess
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 from capforge.verification.sandbox import SandboxRunner
 
@@ -59,9 +59,9 @@ class DockerSandboxRunner(SandboxRunner):
         self,
         code_body: str,
         entrypoint: str,
-        inputs: Dict[str, Any],
+        inputs: dict[str, Any],
         timeout_sec: float = 10.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Execute code in Docker container if available, otherwise fallback to subprocess sandbox."""
         if not self._docker_available:
             logger.debug("Docker daemon unavailable. Using subprocess sandbox runner.")

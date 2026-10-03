@@ -6,7 +6,7 @@ Exposes CapForge capabilities as native CrewAI tools for multi-agent role-playin
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from capforge.adapter.standard import StandardAgentAdapter
 from capforge.core.models import Capability, ExecutionResponse
@@ -43,7 +43,7 @@ class CrewAIAgentAdapter(StandardAgentAdapter):
         """Wrap a CapForge Capability into a CrewAI-compatible tool."""
         return CrewAIToolWrapper(capability=capability, adapter=self)
 
-    def get_crewai_tools(self, namespace: Optional[str] = None) -> List[CrewAIToolWrapper]:
+    def get_crewai_tools(self, namespace: str | None = None) -> list[CrewAIToolWrapper]:
         """Return all active capabilities formatted for CrewAI agents."""
         caps = self.registry.list_capabilities(namespace=namespace)
         return [self.to_crewai_tool(c) for c in caps]

@@ -10,12 +10,14 @@ import contextvars
 import time
 import uuid
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
 class SpanContext(BaseModel):
     """W3C-compatible trace context."""
+
     trace_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     span_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:16])
     trace_flags: int = 1
@@ -23,29 +25,32 @@ class SpanContext(BaseModel):
 
 class Span(BaseModel):
     """Represents a single timed unit of work in CapForge runtime."""
+
     name: str
     trace_id: str
     span_id: str
-    parent_span_id: Optional[str] = None
+    parent_span_id: str | None = None
     start_time: float = Field(default_factory=time.time)
-    end_time: Optional[float] = None
-    duration_ms: Optional[float] = None
+    end_time: float | None = None
+    duration_ms: float | None = None
     status: str = "OK"  # "OK" | "ERROR"
-    error_message: Optional[str] = None
-    attributes: Dict[str, Any] = Field(default_factory=dict)
-    events: List[Dict[str, Any]] = Field(default_factory=list)
+    error_message: str | None = None
+    attributes: dict[str, Any] = Field(default_factory=dict)
+    events: list[dict[str, Any]] = Field(default_factory=list)
 
     def set_attribute(self, key: str, value: Any) -> None:
         self.attributes[key] = value
 
-    def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None) -> None:
-        self.events.append({
-            "name": name,
-            "timestamp": time.time(),
-            "attributes": attributes or {},
-        })
+    def add_event(self, name: str, attributes: dict[str, Any] | None = None) -> None:
+        self.events.append(
+            {
+                "name": name,
+                "timestamp": time.time(),
+                "attributes": attributes or {},
+            }
+        )
 
-    def end(self, status: str = "OK", error: Optional[str] = None) -> None:
+    def end(self, status: str = "OK", error: str | None = None) -> None:
         self.end_time = time.time()
         self.duration_ms = round((self.end_time - self.start_time) * 1000.0, 3)
         self.status = status
@@ -55,9 +60,7 @@ class Span(BaseModel):
 
 
 # Global context variable for active span
-_current_span_var: contextvars.ContextVar[Optional[Span]] = contextvars.ContextVar(
-    "current_span", default=None
-)
+_current_span_var: contextvars.ContextVar[Span | None] = contextvars.ContextVar("current_span", default=None)
 
 
 class TraceManager:
@@ -65,9 +68,9 @@ class TraceManager:
 
     def __init__(self, max_buffer_size: int = 2000):
         self.max_buffer_size = max_buffer_size
-        self._spans: List[Span] = []
+        self._spans: list[Span] = []
 
-    def get_current_span(self) -> Optional[Span]:
+    def get_current_span(self) -> Span | None:
         return _current_span_var.get()
 
     def get_current_trace_id(self) -> str:
@@ -78,9 +81,9 @@ class TraceManager:
     def start_span(
         self,
         name: str,
-        attributes: Optional[Dict[str, Any]] = None,
-        parent_trace_id: Optional[str] = None,
-        parent_span_id: Optional[str] = None,
+        attributes: dict[str, Any] | None = None,
+        parent_trace_id: str | None = None,
+        parent_span_id: str | None = None,
     ):
         """Context manager to create, activate, and automatically end a trace span."""
         parent_span = self.get_current_span()
@@ -116,10 +119,10 @@ class TraceManager:
 
     def list_spans(
         self,
-        trace_id: Optional[str] = None,
-        name: Optional[str] = None,
+        trace_id: str | None = None,
+        name: str | None = None,
         limit: int = 50,
-    ) -> List[Span]:
+    ) -> list[Span]:
         """Query recorded spans with optional filtering."""
         filtered = self._spans
         if trace_id:

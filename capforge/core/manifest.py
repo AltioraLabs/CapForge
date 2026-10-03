@@ -6,9 +6,9 @@ for version-controlled, auditable capability definitions.
 
 from __future__ import annotations
 
+from typing import Any
+
 import yaml
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
 
 from capforge.core.models import (
     Capability,
@@ -25,7 +25,7 @@ from capforge.core.models import (
 )
 
 
-def capability_to_manifest_dict(cap: Capability) -> Dict[str, Any]:
+def capability_to_manifest_dict(cap: Capability) -> dict[str, Any]:
     """Convert a Capability model to a canonical manifest dictionary per §12."""
     inputs_dict = {
         name: {
@@ -116,7 +116,7 @@ def capability_to_yaml(cap: Capability) -> str:
     return yaml.dump(manifest_dict, sort_keys=False, indent=2, allow_unicode=True)
 
 
-def manifest_dict_to_capability(data: Dict[str, Any]) -> Capability:
+def manifest_dict_to_capability(data: dict[str, Any]) -> Capability:
     """Parse a manifest dictionary into a validated Capability instance."""
     cap_id = data.get("capability_id") or data.get("id")
     if not cap_id:
@@ -169,7 +169,7 @@ def manifest_dict_to_capability(data: Dict[str, Any]) -> Capability:
     )
 
     # Inputs & Outputs
-    inputs: Dict[str, ParameterSpec] = {}
+    inputs: dict[str, ParameterSpec] = {}
     for k, v in data.get("inputs", {}).items():
         if isinstance(v, dict):
             inputs[k] = ParameterSpec(
@@ -182,7 +182,7 @@ def manifest_dict_to_capability(data: Dict[str, Any]) -> Capability:
         else:
             inputs[k] = ParameterSpec(name=k, type_name=str(v), required=True)
 
-    outputs: Dict[str, ParameterSpec] = {}
+    outputs: dict[str, ParameterSpec] = {}
     for k, v in data.get("outputs", {}).items():
         if isinstance(v, dict):
             outputs[k] = ParameterSpec(
@@ -201,10 +201,7 @@ def manifest_dict_to_capability(data: Dict[str, Any]) -> Capability:
 
     # Tools
     tools_list = data.get("tools", [])
-    tools_required = [
-        ToolRequirement(name=t if isinstance(t, str) else t.get("name", str(t)))
-        for t in tools_list
-    ]
+    tools_required = [ToolRequirement(name=t if isinstance(t, str) else t.get("name", str(t))) for t in tools_list]
 
     # Dependencies
     deps_list = data.get("dependencies", [])
@@ -213,11 +210,13 @@ def manifest_dict_to_capability(data: Dict[str, Any]) -> Capability:
         if isinstance(d, str):
             dependencies.append(CapabilityDependency(capability_id=d))
         elif isinstance(d, dict):
-            dependencies.append(CapabilityDependency(
-                capability_id=d.get("capability_id", ""),
-                version_constraint=d.get("version_constraint", ">=1.0.0"),
-                primitive_type=d.get("primitive_type"),
-            ))
+            dependencies.append(
+                CapabilityDependency(
+                    capability_id=d.get("capability_id", ""),
+                    version_constraint=d.get("version_constraint", ">=1.0.0"),
+                    primitive_type=d.get("primitive_type"),
+                )
+            )
 
     # Verification tests
     tests_list = data.get("verification_tests", [])
@@ -228,16 +227,18 @@ def manifest_dict_to_capability(data: Dict[str, Any]) -> Capability:
             ttype = TestType(test_type_str)
         except ValueError:
             ttype = TestType.SMOKE
-        verification_tests.append(TestCase(
-            id=t.get("id", f"test_{len(verification_tests)+1}"),
-            name=t.get("name", "Verification Test"),
-            test_type=ttype,
-            inputs=t.get("inputs", {}),
-            expected_keys=t.get("expected_keys", []),
-            expected_output_contains=t.get("expected_output_contains", []),
-            assert_expression=t.get("assert_expression"),
-            max_timeout_sec=float(t.get("max_timeout_sec", 10.0)),
-        ))
+        verification_tests.append(
+            TestCase(
+                id=t.get("id", f"test_{len(verification_tests) + 1}"),
+                name=t.get("name", "Verification Test"),
+                test_type=ttype,
+                inputs=t.get("inputs", {}),
+                expected_keys=t.get("expected_keys", []),
+                expected_output_contains=t.get("expected_output_contains", []),
+                assert_expression=t.get("assert_expression"),
+                max_timeout_sec=float(t.get("max_timeout_sec", 10.0)),
+            )
+        )
 
     return Capability(
         id=cap_id,

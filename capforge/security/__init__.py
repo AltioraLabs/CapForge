@@ -34,6 +34,7 @@ _LAZY = {
 def __getattr__(name: str):
     if name in _LAZY:
         import importlib
+
         module = importlib.import_module(_LAZY[name])
         obj = getattr(module, name)
         # Cache so subsequent access doesn't go through __getattr__ again

@@ -7,14 +7,13 @@ historical lineage tracking, risk-based governance, and rollback operations.
 from __future__ import annotations
 
 import logging
-from typing import Optional, Tuple
 
-from capforge.core.models import Capability, CapabilityStatus, RiskLevel, VerificationResult
-from capforge.core.exceptions import VerificationFailedError, RegressionDetectedError
-from capforge.core.governance import RiskEngine, RiskAssessment
+from capforge.core.exceptions import RegressionDetectedError, VerificationFailedError
+from capforge.core.governance import RiskAssessment, RiskEngine
+from capforge.core.models import Capability, CapabilityStatus, VerificationResult
 from capforge.registry.store import CapabilityRegistry
-from capforge.versioning.regression import RegressionSuiteRunner
 from capforge.verification.evaluator import CapabilityEvaluator
+from capforge.versioning.regression import RegressionSuiteRunner
 
 logger = logging.getLogger("capforge.versioning")
 
@@ -22,7 +21,7 @@ logger = logging.getLogger("capforge.versioning")
 class VersionManager:
     """Orchestrates capability promotion, versioning, and rollback governance."""
 
-    def __init__(self, registry: CapabilityRegistry, risk_engine: Optional[RiskEngine] = None):
+    def __init__(self, registry: CapabilityRegistry, risk_engine: RiskEngine | None = None):
         self.registry = registry
         self.evaluator = CapabilityEvaluator()
         self.regression_runner = RegressionSuiteRunner(registry, self.evaluator)
@@ -53,7 +52,7 @@ class VersionManager:
         candidate: Capability,
         skip_regression: bool = False,
         skip_risk_check: bool = False,
-    ) -> Tuple[VerificationResult, Optional[RiskAssessment]]:
+    ) -> tuple[VerificationResult, RiskAssessment | None]:
         """Validate candidate against verification tests and regression battery before promoting to ACTIVE.
 
         Returns (verification_result, risk_assessment).
@@ -79,7 +78,7 @@ class VersionManager:
                 capability_id=candidate.id,
                 failed_tests=verif.tests_failed,
                 total_tests=verif.tests_run,
-                details=verif.diagnostics or ""
+                details=verif.diagnostics or "",
             )
 
         # 2. Regression Gate
@@ -89,9 +88,7 @@ class VersionManager:
             if not regression_passed:
                 first_fail = failed_test_ids[0] if failed_test_ids else "unknown"
                 raise RegressionDetectedError(
-                    capability_id=candidate.id,
-                    broken_version=candidate.version,
-                    test_id=first_fail
+                    capability_id=candidate.id, broken_version=candidate.version, test_id=first_fail
                 )
 
         # 3. Demote any previously ACTIVE version to DEPRECATED

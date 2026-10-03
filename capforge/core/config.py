@@ -7,7 +7,7 @@ For production, set all variables marked [PROD] via .env or container secrets.
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -18,9 +18,19 @@ class Settings(BaseModel):
     # Base Paths
     # ---------------------------------------------------------------------------
     base_dir: Path = Field(default_factory=lambda: Path(os.environ.get("CAPFORGE_BASE_DIR", os.getcwd())))
-    data_dir: Path = Field(default_factory=lambda: Path(os.environ.get("CAPFORGE_DATA_DIR", os.path.join(os.getcwd(), "data"))))
-    db_path: Path = Field(default_factory=lambda: Path(os.environ.get("CAPFORGE_DB_PATH", os.path.join(os.getcwd(), "data", "capforge.db"))))
-    capabilities_dir: Path = Field(default_factory=lambda: Path(os.environ.get("CAPFORGE_CAPABILITIES_DIR", os.path.join(os.getcwd(), "capabilities"))))
+    data_dir: Path = Field(
+        default_factory=lambda: Path(os.environ.get("CAPFORGE_DATA_DIR", os.path.join(os.getcwd(), "data")))
+    )
+    db_path: Path = Field(
+        default_factory=lambda: Path(
+            os.environ.get("CAPFORGE_DB_PATH", os.path.join(os.getcwd(), "data", "capforge.db"))
+        )
+    )
+    capabilities_dir: Path = Field(
+        default_factory=lambda: Path(
+            os.environ.get("CAPFORGE_CAPABILITIES_DIR", os.path.join(os.getcwd(), "capabilities"))
+        )
+    )
 
     # ---------------------------------------------------------------------------
     # Sandbox & Execution
@@ -42,8 +52,8 @@ class Settings(BaseModel):
     # Falls back to template synthesis when not configured.
     # ---------------------------------------------------------------------------
     llm_provider: str = os.environ.get("CAPFORGE_LLM_PROVIDER", "template")  # gemini | openai | template
-    gemini_api_key: Optional[str] = os.environ.get("GEMINI_API_KEY")
-    openai_api_key: Optional[str] = os.environ.get("OPENAI_API_KEY")
+    gemini_api_key: str | None = os.environ.get("GEMINI_API_KEY")
+    openai_api_key: str | None = os.environ.get("OPENAI_API_KEY")
     llm_model: str = os.environ.get("CAPFORGE_LLM_MODEL", "gemini-1.5-flash")
     llm_synthesis_temperature: float = float(os.environ.get("CAPFORGE_LLM_TEMPERATURE", "0.2"))
     llm_max_output_tokens: int = int(os.environ.get("CAPFORGE_LLM_MAX_TOKENS", "4096"))
@@ -53,7 +63,7 @@ class Settings(BaseModel):
     # Set CAPFORGE_REDIS_URL for distributed event streaming and rate limiting.
     # Falls back to in-memory when not configured.
     # ---------------------------------------------------------------------------
-    redis_url: Optional[str] = os.environ.get("CAPFORGE_REDIS_URL")  # e.g. redis://:password@host:6379/0
+    redis_url: str | None = os.environ.get("CAPFORGE_REDIS_URL")  # e.g. redis://:password@host:6379/0
     redis_max_connections: int = int(os.environ.get("CAPFORGE_REDIS_MAX_CONNECTIONS", "20"))
 
     # ---------------------------------------------------------------------------
@@ -62,7 +72,11 @@ class Settings(BaseModel):
     # NEVER set dev mode in production.
     # ---------------------------------------------------------------------------
     dev_mode: bool = os.environ.get("CAPFORGE_DEV_MODE", "false").lower() == "true"
-    auth_db_path: Path = Field(default_factory=lambda: Path(os.environ.get("CAPFORGE_AUTH_DB_PATH", os.path.join(os.getcwd(), "data", "capforge_auth.db"))))
+    auth_db_path: Path = Field(
+        default_factory=lambda: Path(
+            os.environ.get("CAPFORGE_AUTH_DB_PATH", os.path.join(os.getcwd(), "data", "capforge_auth.db"))
+        )
+    )
 
     # ---------------------------------------------------------------------------
     # Rate Limiting
@@ -102,7 +116,7 @@ class Settings(BaseModel):
         return bool(self.redis_url)
 
 
-def setup_logging(level: Optional[str] = None) -> None:
+def setup_logging(level: str | None = None) -> None:
     """Configure structured logging for CapForge."""
     log_level = level or settings.log_level
     logging.basicConfig(

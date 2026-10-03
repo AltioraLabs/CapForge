@@ -10,8 +10,9 @@ import enum
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from capforge.core.events import EventGateway
@@ -32,21 +33,23 @@ class WorkflowStatus(str, enum.Enum):
 
 class StepCheckpoint(BaseModel):
     """Execution checkpoint for a durable workflow step."""
+
     step_id: str
     status: str = "PENDING"  # PENDING, RUNNING, COMPLETED, FAILED, SKIPPED
     attempt_count: int = 0
-    output: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
+    output: dict[str, Any] | None = None
+    error: str | None = None
+    started_at: str | None = None
+    completed_at: str | None = None
 
 
 class WorkflowStep(BaseModel):
     """Specification of an individual step in a durable workflow."""
+
     step_id: str
     capability_id: str
-    version: Optional[str] = None
-    input_mappings: Dict[str, Any] = Field(
+    version: str | None = None
+    input_mappings: dict[str, Any] = Field(
         default_factory=dict,
         description="Maps inputs using literal values, '$inputs.<param>', or '$steps.<step_id>.output.<field>'",
     )
@@ -57,24 +60,26 @@ class WorkflowStep(BaseModel):
 
 class WorkflowDefinition(BaseModel):
     """Declarative definition of a durable multi-step workflow."""
+
     workflow_id: str
     name: str
     description: str = ""
-    steps: List[WorkflowStep] = Field(default_factory=list)
-    output_mappings: Dict[str, str] = Field(default_factory=dict)
+    steps: list[WorkflowStep] = Field(default_factory=list)
+    output_mappings: dict[str, str] = Field(default_factory=dict)
 
 
 class WorkflowExecutionState(BaseModel):
     """Durable state record of a workflow run with all checkpoints."""
+
     run_id: str = Field(default_factory=lambda: f"wf_run_{uuid.uuid4().hex[:10]}")
     workflow_id: str
     status: WorkflowStatus = WorkflowStatus.PENDING
-    inputs: Dict[str, Any] = Field(default_factory=dict)
-    checkpoints: Dict[str, StepCheckpoint] = Field(default_factory=dict)
-    final_output: Dict[str, Any] = Field(default_factory=dict)
-    error: Optional[str] = None
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    checkpoints: dict[str, StepCheckpoint] = Field(default_factory=dict)
+    final_output: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class DurableWorkflowEngine:
@@ -83,39 +88,39 @@ class DurableWorkflowEngine:
     def __init__(
         self,
         executor: CapabilityExecutor,
-        event_gateway: Optional[EventGateway] = None,
+        event_gateway: EventGateway | None = None,
     ):
         self.executor = executor
         self.event_gateway = event_gateway
-        self._execution_store: Dict[str, WorkflowExecutionState] = {}
-        self._workflow_definitions: Dict[str, WorkflowDefinition] = {}
+        self._execution_store: dict[str, WorkflowExecutionState] = {}
+        self._workflow_definitions: dict[str, WorkflowDefinition] = {}
 
     def register_workflow(self, workflow: WorkflowDefinition) -> None:
         """Register a reusable workflow definition."""
         self._workflow_definitions[workflow.workflow_id] = workflow
 
-    def get_workflow(self, workflow_id: str) -> Optional[WorkflowDefinition]:
+    def get_workflow(self, workflow_id: str) -> WorkflowDefinition | None:
         return self._workflow_definitions.get(workflow_id)
 
-    def get_workflow_state(self, run_id: str) -> Optional[WorkflowExecutionState]:
+    def get_workflow_state(self, run_id: str) -> WorkflowExecutionState | None:
         """Fetch current state of a workflow run."""
         return self._execution_store.get(run_id)
 
-    def list_workflow_runs(self, limit: int = 50) -> List[WorkflowExecutionState]:
+    def list_workflow_runs(self, limit: int = 50) -> list[WorkflowExecutionState]:
         return list(reversed(list(self._execution_store.values())))[:limit]
 
     def _resolve_step_inputs(
         self,
         step: WorkflowStep,
-        initial_inputs: Dict[str, Any],
-        checkpoints: Dict[str, StepCheckpoint],
-    ) -> Dict[str, Any]:
+        initial_inputs: dict[str, Any],
+        checkpoints: dict[str, StepCheckpoint],
+    ) -> dict[str, Any]:
         """Resolve dynamic input values for a step."""
-        resolved: Dict[str, Any] = {}
+        resolved: dict[str, Any] = {}
         for param, mapping in step.input_mappings.items():
             if isinstance(mapping, str):
                 if mapping.startswith("$inputs."):
-                    field = mapping[len("$inputs."):]
+                    field = mapping[len("$inputs.") :]
                     resolved[param] = initial_inputs.get(field)
                 elif mapping.startswith("$steps."):
                     parts = mapping.split(".")
@@ -139,15 +144,15 @@ class DurableWorkflowEngine:
     def _resolve_final_output(
         self,
         workflow: WorkflowDefinition,
-        initial_inputs: Dict[str, Any],
-        checkpoints: Dict[str, StepCheckpoint],
-    ) -> Dict[str, Any]:
+        initial_inputs: dict[str, Any],
+        checkpoints: dict[str, StepCheckpoint],
+    ) -> dict[str, Any]:
         """Assemble workflow output from output_mappings or last successful step output."""
         if workflow.output_mappings:
-            out: Dict[str, Any] = {}
+            out: dict[str, Any] = {}
             for out_key, mapping in workflow.output_mappings.items():
                 if mapping.startswith("$inputs."):
-                    field = mapping[len("$inputs."):]
+                    field = mapping[len("$inputs.") :]
                     out[out_key] = initial_inputs.get(field)
                 elif mapping.startswith("$steps."):
                     parts = mapping.split(".")
@@ -168,8 +173,8 @@ class DurableWorkflowEngine:
     def start_workflow(
         self,
         workflow: WorkflowDefinition,
-        inputs: Dict[str, Any],
-        run_id: Optional[str] = None,
+        inputs: dict[str, Any],
+        run_id: str | None = None,
     ) -> WorkflowExecutionState:
         """Start a new durable workflow execution run."""
         self.register_workflow(workflow)
@@ -188,18 +193,20 @@ class DurableWorkflowEngine:
         self._execution_store[rid] = state
 
         if self.event_gateway:
-            self.event_gateway.emit(AgentEvent(
-                event_type=EventType.TASK_STARTED,
-                run_id=rid,
-                input_data={"workflow_id": workflow.workflow_id, "inputs": inputs},
-            ))
+            self.event_gateway.emit(
+                AgentEvent(
+                    event_type=EventType.TASK_STARTED,
+                    run_id=rid,
+                    input_data={"workflow_id": workflow.workflow_id, "inputs": inputs},
+                )
+            )
 
         return self._execute_state(state, workflow)
 
     def resume_workflow(
         self,
         run_id: str,
-        workflow: Optional[WorkflowDefinition] = None,
+        workflow: WorkflowDefinition | None = None,
     ) -> WorkflowExecutionState:
         """Resume execution of a paused or failed workflow from the last checkpoint."""
         state = self._execution_store.get(run_id)
@@ -211,7 +218,7 @@ class DurableWorkflowEngine:
             raise ValueError(f"Workflow definition '{state.workflow_id}' not found.")
 
         state.status = WorkflowStatus.RUNNING
-        state.updated_at = datetime.now(timezone.utc).isoformat()
+        state.updated_at = datetime.now(UTC).isoformat()
         state.error = None
 
         logger.info("Resuming durable workflow run '%s' from checkpoint", run_id)
@@ -224,7 +231,7 @@ class DurableWorkflowEngine:
             raise ValueError(f"Workflow run '{run_id}' not found.")
 
         state.status = WorkflowStatus.CANCELLED
-        state.updated_at = datetime.now(timezone.utc).isoformat()
+        state.updated_at = datetime.now(UTC).isoformat()
         return state
 
     def _execute_state(
@@ -245,7 +252,7 @@ class DurableWorkflowEngine:
                 continue
 
             cp.status = "RUNNING"
-            cp.started_at = datetime.now(timezone.utc).isoformat()
+            cp.started_at = datetime.now(UTC).isoformat()
 
             step_inputs = self._resolve_step_inputs(step, state.inputs, state.checkpoints)
             step_success = False
@@ -268,7 +275,7 @@ class DurableWorkflowEngine:
                         cp.status = "COMPLETED"
                         cp.output = res.output if isinstance(res.output, dict) else {"result": res.output}
                         cp.error = None
-                        cp.completed_at = datetime.now(timezone.utc).isoformat()
+                        cp.completed_at = datetime.now(UTC).isoformat()
                         step_success = True
                         break
                     else:
@@ -277,37 +284,41 @@ class DurableWorkflowEngine:
                     last_error = str(e)
 
                 if attempt < max_attempts - 1:
-                    backoff = step.retry_delay_sec * (2 ** attempt)
+                    backoff = step.retry_delay_sec * (2**attempt)
                     time.sleep(backoff)
 
             if not step_success:
                 cp.status = "FAILED"
                 cp.error = last_error
-                cp.completed_at = datetime.now(timezone.utc).isoformat()
+                cp.completed_at = datetime.now(UTC).isoformat()
 
                 if not step.continue_on_failure:
                     state.status = WorkflowStatus.PAUSED
                     state.error = f"Step '{step.step_id}' failed: {last_error}"
-                    state.updated_at = datetime.now(timezone.utc).isoformat()
+                    state.updated_at = datetime.now(UTC).isoformat()
 
                     if self.event_gateway:
-                        self.event_gateway.emit(AgentEvent(
-                            event_type=EventType.TASK_FAILED,
-                            run_id=state.run_id,
-                            error_message=state.error,
-                        ))
+                        self.event_gateway.emit(
+                            AgentEvent(
+                                event_type=EventType.TASK_FAILED,
+                                run_id=state.run_id,
+                                error_message=state.error,
+                            )
+                        )
                     return state
 
         # All steps executed or continued
         state.status = WorkflowStatus.COMPLETED
         state.final_output = self._resolve_final_output(workflow, state.inputs, state.checkpoints)
-        state.updated_at = datetime.now(timezone.utc).isoformat()
+        state.updated_at = datetime.now(UTC).isoformat()
 
         if self.event_gateway:
-            self.event_gateway.emit(AgentEvent(
-                event_type=EventType.TASK_COMPLETED,
-                run_id=state.run_id,
-                output_data={"final_output": state.final_output},
-            ))
+            self.event_gateway.emit(
+                AgentEvent(
+                    event_type=EventType.TASK_COMPLETED,
+                    run_id=state.run_id,
+                    output_data={"final_output": state.final_output},
+                )
+            )
 
         return state

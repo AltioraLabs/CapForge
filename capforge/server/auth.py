@@ -16,17 +16,15 @@ from __future__ import annotations
 
 import enum
 import hashlib
-import json
 import logging
 import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
-from pydantic import BaseModel, Field
-from fastapi import Depends, Header, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Security, status
 from fastapi.security.api_key import APIKeyHeader
+from pydantic import BaseModel, Field
 
 from capforge.core.config import settings
 
@@ -46,12 +44,13 @@ _ROLE_ORDER = [UserRole.AUDITOR, UserRole.AGENT_RUNNER, UserRole.OPERATOR, UserR
 
 class APIKeyRecord(BaseModel):
     """Secure metadata record for a provisioned API key."""
+
     key_id: str
     key_hash: str
     name: str
     role: UserRole
     tenant_namespace: str = "default"  # "*" matches all namespaces
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     revoked: bool = False
 
 
@@ -59,10 +58,11 @@ class APIKeyRecord(BaseModel):
 # Persistent Auth Store — SQLite backend
 # ---------------------------------------------------------------------------
 
+
 class AuthStore:
     """SQLite-backed persistence for API key records."""
 
-    def __init__(self, db_path: Optional[Path | str] = None):
+    def __init__(self, db_path: Path | str | None = None):
         self.db_path = Path(db_path) if db_path else settings.auth_db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
@@ -92,31 +92,32 @@ class AuthStore:
 
     def save(self, record: APIKeyRecord) -> None:
         with self._connect() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO api_keys
                     (key_id, key_hash, name, role, tenant_namespace, created_at, revoked)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                record.key_id,
-                record.key_hash,
-                record.name,
-                record.role.value,
-                record.tenant_namespace,
-                record.created_at,
-                1 if record.revoked else 0,
-            ))
+            """,
+                (
+                    record.key_id,
+                    record.key_hash,
+                    record.name,
+                    record.role.value,
+                    record.tenant_namespace,
+                    record.created_at,
+                    1 if record.revoked else 0,
+                ),
+            )
             conn.commit()
 
-    def get_by_hash(self, key_hash: str) -> Optional[APIKeyRecord]:
+    def get_by_hash(self, key_hash: str) -> APIKeyRecord | None:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM api_keys WHERE key_hash = ? AND revoked = 0", (key_hash,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM api_keys WHERE key_hash = ? AND revoked = 0", (key_hash,)).fetchone()
         if not row:
             return None
         return self._row_to_record(row)
 
-    def get_by_id(self, key_id: str) -> Optional[APIKeyRecord]:
+    def get_by_id(self, key_id: str) -> APIKeyRecord | None:
         with self._connect() as conn:
             row = conn.execute("SELECT * FROM api_keys WHERE key_id = ?", (key_id,)).fetchone()
         if not row:
@@ -125,13 +126,11 @@ class AuthStore:
 
     def revoke(self, key_id: str) -> bool:
         with self._connect() as conn:
-            cur = conn.execute(
-                "UPDATE api_keys SET revoked = 1 WHERE key_id = ? AND revoked = 0", (key_id,)
-            )
+            cur = conn.execute("UPDATE api_keys SET revoked = 1 WHERE key_id = ? AND revoked = 0", (key_id,))
             conn.commit()
         return cur.rowcount > 0
 
-    def list_all(self) -> List[APIKeyRecord]:
+    def list_all(self) -> list[APIKeyRecord]:
         with self._connect() as conn:
             rows = conn.execute("SELECT * FROM api_keys ORDER BY created_at DESC").fetchall()
         return [self._row_to_record(r) for r in rows]
@@ -153,10 +152,11 @@ class AuthStore:
 # Auth Manager
 # ---------------------------------------------------------------------------
 
+
 class AuthManager:
     """Manages generation, persistent storage, and validation of cryptographic API keys."""
 
-    def __init__(self, store: Optional[AuthStore] = None):
+    def __init__(self, store: AuthStore | None = None):
         self._store = store or AuthStore()
         self._ensure_bootstrap_admin()
 
@@ -190,7 +190,7 @@ class AuthManager:
         name: str,
         role: UserRole = UserRole.AGENT_RUNNER,
         tenant_namespace: str = "default",
-    ) -> Tuple[str, APIKeyRecord]:
+    ) -> tuple[str, APIKeyRecord]:
         """Generate a new secure API key and persist it. Returns (raw_token, record)."""
         raw_token = f"sf_live_{secrets.token_urlsafe(32)}"
         key_id = f"key_{secrets.token_hex(8)}"
@@ -204,11 +204,14 @@ class AuthManager:
         self._store.save(rec)
         logger.info(
             "API key created: id=%s name=%s role=%s namespace=%s",
-            key_id, name, role.value, tenant_namespace,
+            key_id,
+            name,
+            role.value,
+            tenant_namespace,
         )
         return raw_token, rec
 
-    def authenticate(self, raw_token: Optional[str]) -> Optional[APIKeyRecord]:
+    def authenticate(self, raw_token: str | None) -> APIKeyRecord | None:
         """Validate raw token against stored SHA-256 hashes. Returns None if invalid/revoked."""
         if not raw_token:
             return None
@@ -222,14 +225,14 @@ class AuthManager:
             logger.warning("API key revoked: key_id=%s", key_id)
         return revoked
 
-    def list_keys(self) -> List[APIKeyRecord]:
+    def list_keys(self) -> list[APIKeyRecord]:
         return self._store.list_all()
 
     def authorize(
         self,
         record: APIKeyRecord,
-        allowed_roles: List[UserRole],
-        target_namespace: Optional[str] = None,
+        allowed_roles: list[UserRole],
+        target_namespace: str | None = None,
     ) -> bool:
         """Check role hierarchy and tenant namespace boundary.
 
@@ -258,7 +261,7 @@ API_KEY_HEADER = APIKeyHeader(name="X-CapForge-Key", auto_error=False)
 
 
 def get_current_user_key(
-    api_key: Optional[str] = Security(API_KEY_HEADER),
+    api_key: str | None = Security(API_KEY_HEADER),
 ) -> APIKeyRecord:
     """FastAPI dependency: authenticate the incoming X-CapForge-Key header.
 
@@ -289,6 +292,7 @@ def get_current_user_key(
 
 def require_roles(*allowed_roles: UserRole):
     """Enforce specific roles on an API route. ADMIN is always allowed."""
+
     def role_checker(record: APIKeyRecord = Depends(get_current_user_key)) -> APIKeyRecord:
         if record.role != UserRole.ADMIN and record.role not in allowed_roles:
             raise HTTPException(
@@ -299,4 +303,5 @@ def require_roles(*allowed_roles: UserRole):
                 ),
             )
         return record
+
     return role_checker

@@ -12,11 +12,10 @@ Synthesis Backends (in priority order):
 from __future__ import annotations
 
 import ast
-import json
 import logging
 import re
 import textwrap
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from capforge.core.models import (
     Capability,
@@ -85,10 +84,12 @@ Output only valid JSON. No markdown, no explanation.
 # LLM Backend Implementations
 # ---------------------------------------------------------------------------
 
-def _synthesize_with_gemini(task_intent: str, api_key: str, model: str, temperature: float) -> Optional[str]:
+
+def _synthesize_with_gemini(task_intent: str, api_key: str, model: str, temperature: float) -> str | None:
     """Call Gemini API to synthesize capability code. Returns raw Python code string or None."""
     try:
         import google.generativeai as genai
+
         genai.configure(api_key=api_key)
         client = genai.GenerativeModel(
             model_name=model,
@@ -113,20 +114,24 @@ def _synthesize_with_gemini(task_intent: str, api_key: str, model: str, temperat
         return None
 
 
-def _synthesize_with_openai(task_intent: str, api_key: str, model: str, temperature: float) -> Optional[str]:
+def _synthesize_with_openai(task_intent: str, api_key: str, model: str, temperature: float) -> str | None:
     """Call OpenAI API to synthesize capability code. Returns raw Python code string or None."""
     try:
         import httpx
+
         headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
         payload = {
             "model": model or "gpt-4o-mini",
             "temperature": temperature,
             "messages": [
                 {"role": "system", "content": _SYNTHESIS_SYSTEM_PROMPT},
-                {"role": "user", "content": _SYNTHESIS_USER_PROMPT.format(
-                    task_intent=task_intent,
-                    inputs_description="passed as dict",
-                )},
+                {
+                    "role": "user",
+                    "content": _SYNTHESIS_USER_PROMPT.format(
+                        task_intent=task_intent,
+                        inputs_description="passed as dict",
+                    ),
+                },
             ],
             "max_tokens": 4096,
         }
@@ -192,11 +197,13 @@ def _build_template_code(task_intent: str, capability_id: str) -> str:
 # Main Synthesizer Class
 # ---------------------------------------------------------------------------
 
+
 class CapabilitySynthesizer:
     """Synthesizes structured, testable Capability objects using LLM or template fallback."""
 
     def __init__(self):
         from capforge.core.config import settings
+
         self.settings = settings
         self._log_backend()
 
@@ -214,7 +221,7 @@ class CapabilitySynthesizer:
                 self.settings.llm_provider,
             )
 
-    def synthesize_from_intent(self, task_intent: str, target_id: Optional[str] = None) -> Capability:
+    def synthesize_from_intent(self, task_intent: str, target_id: str | None = None) -> Capability:
         """Synthesize a candidate capability from a natural language task intent.
 
         Attempts real LLM synthesis first; falls back to template on failure.
@@ -277,12 +284,18 @@ class CapabilitySynthesizer:
             tags=["synthesized", "autonomous", synthesis_method],
             inputs={
                 "payload": ParameterSpec(
-                    name="payload", type="dict",
-                    description="Target input data payload", required=False, default={},
+                    name="payload",
+                    type="dict",
+                    description="Target input data payload",
+                    required=False,
+                    default={},
                 ),
                 "mode": ParameterSpec(
-                    name="mode", type="string",
-                    description="Execution mode", required=False, default="default",
+                    name="mode",
+                    type="string",
+                    description="Execution mode",
+                    required=False,
+                    default="default",
                 ),
             },
             outputs={
@@ -319,10 +332,10 @@ class CapabilitySynthesizer:
         description: str,
         domain: str,
         base_url: str,
-        endpoints: List[Dict[str, Any]],
+        endpoints: list[dict[str, Any]],
         auth_type: str = "Bearer",
-        tags: Optional[List[str]] = None,
-        code_override: Optional[str] = None,
+        tags: list[str] | None = None,
+        code_override: str | None = None,
     ) -> Capability:
         """Synthesize a complete capability for interacting with an API service."""
         tags = tags or ["api", "integration", domain]
@@ -330,16 +343,24 @@ class CapabilitySynthesizer:
 
         inputs = {
             "api_key": ParameterSpec(
-                name="api_key", type="string",
-                description="API key or token for authentication", required=True,
+                name="api_key",
+                type="string",
+                description="API key or token for authentication",
+                required=True,
             ),
             "endpoint_path": ParameterSpec(
-                name="endpoint_path", type="string",
-                description="Relative API endpoint", required=False, default=first_path,
+                name="endpoint_path",
+                type="string",
+                description="Relative API endpoint",
+                required=False,
+                default=first_path,
             ),
             "params": ParameterSpec(
-                name="params", type="dict",
-                description="Query parameters", required=False, default={},
+                name="params",
+                type="dict",
+                description="Query parameters",
+                required=False,
+                default={},
             ),
         }
 

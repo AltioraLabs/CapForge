@@ -8,12 +8,11 @@ governance, learning jobs, manifest import/export, and capability graph queries.
 from __future__ import annotations
 
 import logging
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import Body, Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel, Field
@@ -21,11 +20,19 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
+from capforge.acquisition.engine import AcquisitionEngine
+from capforge.acquisition.jobs import LearningJob, LearningJobManager
 from capforge.core.config import settings, setup_logging
+from capforge.core.events import EventGateway, ExperienceFilter
+from capforge.core.governance import (
+    CapabilityFirewall,
+    HumanReviewTicket,
+    RiskAssessment,
+    RiskEngine,
+)
 from capforge.core.manifest import (
     capability_to_yaml,
     manifest_yaml_to_capability,
-    manifest_dict_to_capability,
 )
 from capforge.core.models import (
     AgentEvent,
@@ -36,50 +43,36 @@ from capforge.core.models import (
     ExecutionResponse,
     VerificationResult,
 )
-from capforge.core.events import EventGateway, ExperienceFilter
-from capforge.core.governance import (
-    CapabilityFirewall,
-    FirewallDecision,
-    RiskAssessment,
-    RiskEngine,
-)
-from capforge.registry.store import CapabilityRegistry
-from capforge.registry.search import CapabilityMatcher
-from capforge.discovery.gap_detector import CapabilityGapDetector
+from capforge.core.telemetry import trace_manager
 from capforge.discovery.capability_graph import CapabilityGraph, ImpactReport
-from capforge.acquisition.engine import AcquisitionEngine
-from capforge.acquisition.jobs import LearningJob, LearningJobManager
-from capforge.verification.evaluator import CapabilityEvaluator
-from capforge.verification.test_generator import TestGenerator
-from capforge.versioning.manager import VersionManager
-from capforge.runtime.executor import CapabilityExecutor
+from capforge.discovery.gap_detector import CapabilityGapDetector
+from capforge.events.broker import StreamMessage
+from capforge.mcp.server import CapForgeMCPServer
+from capforge.registry.search import CapabilityMatcher
+from capforge.registry.store import CapabilityRegistry
+from capforge.registry.vector_store import SemanticVectorIndex
+from capforge.runtime.agent_adapter import CapForgeAgent
 from capforge.runtime.composition import CompositionEngine
+from capforge.runtime.durable_workflow import (
+    DurableWorkflowEngine,
+    WorkflowDefinition,
+    WorkflowExecutionState,
+)
+from capforge.runtime.executor import CapabilityExecutor
 from capforge.runtime.pipeline import (
     CapabilityPipeline,
     CapabilityPipelineRunner,
     PipelineExecutionResponse,
 )
-from capforge.runtime.agent_adapter import CapForgeAgent
-from capforge.runtime.durable_workflow import (
-    DurableWorkflowEngine,
-    WorkflowDefinition,
-    WorkflowExecutionState,
-    WorkflowStatus,
-    WorkflowStep,
-)
-from capforge.events.broker import StreamMessage
-from capforge.registry.vector_store import SemanticVectorIndex
 from capforge.server.auth import (
     APIKeyRecord,
-    AuthManager,
     UserRole,
     auth_manager,
-    get_current_user_key,
     require_roles,
 )
-from capforge.mcp.server import CapForgeMCPServer
-from capforge.core.governance import HumanReviewTicket
-from capforge.core.telemetry import trace_manager
+from capforge.verification.evaluator import CapabilityEvaluator
+from capforge.verification.test_generator import TestGenerator
+from capforge.versioning.manager import VersionManager
 
 # Configure logging
 setup_logging()
@@ -147,6 +140,7 @@ mcp_server = CapForgeMCPServer(registry=registry, executor=executor)
 # Request/Response Models
 # ---------------------------------------------------------------------------
 
+
 class TaskAnalyzeRequest(BaseModel):
     task_intent: str
 
@@ -154,7 +148,7 @@ class TaskAnalyzeRequest(BaseModel):
 class CapabilitySearchRequest(BaseModel):
     query: str
     top_k: int = 5
-    domain: Optional[str] = None
+    domain: str | None = None
 
 
 class RollbackRequest(BaseModel):
@@ -163,8 +157,8 @@ class RollbackRequest(BaseModel):
 
 class CreateLearningJobRequest(BaseModel):
     task_intent: str
-    task_inputs: Dict[str, Any] = Field(default_factory=dict)
-    knowledge_spec: Optional[Dict[str, Any]] = None
+    task_inputs: dict[str, Any] = Field(default_factory=dict)
+    knowledge_spec: dict[str, Any] | None = None
 
 
 class PromoteRequest(BaseModel):
@@ -176,8 +170,9 @@ class PromoteRequest(BaseModel):
 # Health & Dashboard UI
 # ---------------------------------------------------------------------------
 
+
 @app.get("/health", tags=["Health"])
-def health_check() -> Dict[str, str]:
+def health_check() -> dict[str, str]:
     return {
         "status": "healthy",
         "service": "capforge",
@@ -187,7 +182,7 @@ def health_check() -> Dict[str, str]:
 
 
 @app.get("/health/ready", tags=["Health"])
-def readiness_check() -> Dict[str, str]:
+def readiness_check() -> dict[str, str]:
     """Kubernetes readiness probe — checks DB is accessible."""
     try:
         registry.list_capabilities(limit=1)
@@ -207,7 +202,7 @@ def get_dashboard_ui() -> HTMLResponse:
 
 
 @app.get("/v1/dashboard/stats", tags=["Dashboard"])
-def get_dashboard_stats() -> Dict[str, Any]:
+def get_dashboard_stats() -> dict[str, Any]:
     """Summary metrics for the Section 46 Control Center Dashboard."""
     caps = registry.list_capabilities()
     active_caps = [c for c in caps if c.status == CapabilityStatus.ACTIVE]
@@ -228,13 +223,14 @@ def get_dashboard_stats() -> Dict[str, Any]:
 # v1 — Discovery & Search
 # ---------------------------------------------------------------------------
 
+
 @app.post("/v1/capabilities/analyze", response_model=CapabilityGap, tags=["Discovery"])
 def analyze_task_gap(req: TaskAnalyzeRequest):
     """Analyze a task and determine if a capability gap exists."""
     return gap_detector.evaluate_task(req.task_intent)
 
 
-@app.post("/v1/capabilities/search", response_model=List[Capability], tags=["Discovery"])
+@app.post("/v1/capabilities/search", response_model=list[Capability], tags=["Discovery"])
 def search_capabilities(req: CapabilitySearchRequest):
     """Search registered capabilities using tag and description overlap matching."""
     matches = matcher.match(req.query, top_k=req.top_k)
@@ -245,12 +241,13 @@ def search_capabilities(req: CapabilitySearchRequest):
 # v1 — Registry & Manifests
 # ---------------------------------------------------------------------------
 
-@app.get("/v1/capabilities", response_model=List[Capability], tags=["Registry"])
+
+@app.get("/v1/capabilities", response_model=list[Capability], tags=["Registry"])
 def list_capabilities(
-    domain: Optional[str] = Query(None),
-    cap_status: Optional[CapabilityStatus] = Query(None, alias="status"),
-    namespace: Optional[str] = Query(None),
-    limit: Optional[int] = Query(None, ge=1, le=500, description="Max results to return"),
+    domain: str | None = Query(None),
+    cap_status: CapabilityStatus | None = Query(None, alias="status"),
+    namespace: str | None = Query(None),
+    limit: int | None = Query(None, ge=1, le=500, description="Max results to return"),
     offset: int = Query(0, ge=0, description="Pagination offset"),
 ):
     """List registered capabilities with optional filtering and pagination."""
@@ -258,7 +255,7 @@ def list_capabilities(
 
 
 @app.get("/v1/capabilities/{capability_id}", response_model=Capability, tags=["Registry"])
-def get_capability(capability_id: str, version: Optional[str] = None):
+def get_capability(capability_id: str, version: str | None = None):
     """Get a specific capability by ID and optional version."""
     cap = registry.get(capability_id, version=version)
     if not cap:
@@ -266,7 +263,7 @@ def get_capability(capability_id: str, version: Optional[str] = None):
     return cap
 
 
-@app.get("/v1/capabilities/{capability_id}/versions", response_model=List[Capability], tags=["Registry"])
+@app.get("/v1/capabilities/{capability_id}/versions", response_model=list[Capability], tags=["Registry"])
 def list_capability_versions(capability_id: str):
     """List all version records for a capability."""
     versions = registry.list_versions(capability_id)
@@ -306,7 +303,7 @@ def import_capability_manifest(manifest_yaml: str = Body(..., media_type="text/p
 
 
 @app.get("/v1/capabilities/{capability_id}/manifest", response_class=PlainTextResponse, tags=["Manifest"])
-def export_capability_manifest(capability_id: str, version: Optional[str] = None) -> PlainTextResponse:
+def export_capability_manifest(capability_id: str, version: str | None = None) -> PlainTextResponse:
     """Export a capability as a canonical YAML manifest."""
     cap = registry.get(capability_id, version=version)
     if not cap:
@@ -318,6 +315,7 @@ def export_capability_manifest(capability_id: str, version: Optional[str] = None
 # ---------------------------------------------------------------------------
 # v1 — Learning Jobs (discussion.mdx §19, §38)
 # ---------------------------------------------------------------------------
+
 
 @app.post("/v1/learning/jobs", response_model=LearningJob, tags=["Learning"])
 def create_learning_job(req: CreateLearningJobRequest):
@@ -331,8 +329,8 @@ def create_learning_job(req: CreateLearningJobRequest):
     return job_manager.execute_job_sync(job.job_id)
 
 
-@app.get("/v1/learning/jobs", response_model=List[LearningJob], tags=["Learning"])
-def list_learning_jobs(status: Optional[str] = Query(None)):
+@app.get("/v1/learning/jobs", response_model=list[LearningJob], tags=["Learning"])
+def list_learning_jobs(status: str | None = Query(None)):
     """List all tracked capability learning jobs."""
     return job_manager.list_jobs(status=status)
 
@@ -350,9 +348,15 @@ def get_learning_job(job_id: str):
 # v1 — Evaluation & Verification (§24)
 # ---------------------------------------------------------------------------
 
+
 @app.post("/v1/capabilities/{capability_id}/evaluate", response_model=VerificationResult, tags=["Verification"])
-@app.post("/v1/skills/{capability_id}/evaluate", response_model=VerificationResult, tags=["Verification"], include_in_schema=False)
-def evaluate_capability(capability_id: str, version: Optional[str] = None):
+@app.post(
+    "/v1/skills/{capability_id}/evaluate",
+    response_model=VerificationResult,
+    tags=["Verification"],
+    include_in_schema=False,
+)
+def evaluate_capability(capability_id: str, version: str | None = None):
     """Run four-level verification tests on a capability."""
     cap = registry.get(capability_id, version=version)
     if not cap:
@@ -363,6 +367,7 @@ def evaluate_capability(capability_id: str, version: Optional[str] = None):
 # ---------------------------------------------------------------------------
 # v1 — Versioning & Promotion
 # ---------------------------------------------------------------------------
+
 
 @app.post("/v1/capabilities/{capability_id}/promote", response_model=Capability, tags=["Versioning"])
 @app.post("/v1/skills/{capability_id}/promote", response_model=Capability, tags=["Versioning"], include_in_schema=False)
@@ -383,7 +388,9 @@ def promote_capability(capability_id: str, req: PromoteRequest = Body(default=Pr
 
 
 @app.post("/v1/capabilities/{capability_id}/rollback", response_model=Capability, tags=["Versioning"])
-@app.post("/v1/skills/{capability_id}/rollback", response_model=Capability, tags=["Versioning"], include_in_schema=False)
+@app.post(
+    "/v1/skills/{capability_id}/rollback", response_model=Capability, tags=["Versioning"], include_in_schema=False
+)
 def rollback_capability(capability_id: str, req: RollbackRequest):
     """Roll back a capability to a previous version."""
     try:
@@ -392,7 +399,9 @@ def rollback_capability(capability_id: str, req: RollbackRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.get("/v1/skills/{capability_id}/versions", response_model=List[Capability], tags=["Versioning"], include_in_schema=False)
+@app.get(
+    "/v1/skills/{capability_id}/versions", response_model=list[Capability], tags=["Versioning"], include_in_schema=False
+)
 def legacy_skill_versions(capability_id: str):
     return list_capability_versions(capability_id)
 
@@ -400,6 +409,7 @@ def legacy_skill_versions(capability_id: str):
 # ---------------------------------------------------------------------------
 # v1 — Execution
 # ---------------------------------------------------------------------------
+
 
 @app.post("/v1/capabilities/execute", response_model=ExecutionResponse, tags=["Execution"])
 def execute_capability(req: ExecutionRequest):
@@ -414,8 +424,9 @@ def execute_capability(req: ExecutionRequest):
 # v1 — Governance & Firewall (§26, §27)
 # ---------------------------------------------------------------------------
 
+
 @app.post("/v1/capabilities/{capability_id}/assess-risk", response_model=RiskAssessment, tags=["Governance"])
-def assess_capability_risk(capability_id: str, version: Optional[str] = None):
+def assess_capability_risk(capability_id: str, version: str | None = None):
     """Assess the risk level of a capability."""
     cap = registry.get(capability_id, version=version)
     if not cap:
@@ -426,6 +437,7 @@ def assess_capability_risk(capability_id: str, version: Optional[str] = None):
 # ---------------------------------------------------------------------------
 # v1 — Events (§9, §16)
 # ---------------------------------------------------------------------------
+
 
 @app.post("/v1/events", tags=["Events"])
 def receive_event(event: AgentEvent):
@@ -449,6 +461,7 @@ def get_recent_events(limit: int = Query(50, ge=1, le=500)):
 # v1 — Capability Graph (§32)
 # ---------------------------------------------------------------------------
 
+
 @app.get("/v1/capability-graph/{capability_id}", tags=["Graph"])
 @app.get("/v1/capability-graph/{capability_id}/impact", response_model=ImpactReport, tags=["Graph"])
 def get_impact_analysis(capability_id: str):
@@ -471,6 +484,7 @@ def get_dependencies(capability_id: str):
 # v1 — Composition
 # ---------------------------------------------------------------------------
 
+
 @app.get("/v1/primitives", tags=["Composition"])
 def list_primitives():
     """List available reusable primitives."""
@@ -481,6 +495,7 @@ def list_primitives():
 # v1 — Model Context Protocol (MCP)
 # ---------------------------------------------------------------------------
 
+
 @app.get("/mcp/tools", tags=["MCP"])
 def get_mcp_tools():
     """List standard MCP tool definitions."""
@@ -488,7 +503,7 @@ def get_mcp_tools():
 
 
 @app.post("/mcp/rpc", tags=["MCP"])
-def handle_mcp_rpc(payload: Dict[str, Any] = Body(...)):
+def handle_mcp_rpc(payload: dict[str, Any] = Body(...)):
     """Handle standard JSON-RPC 2.0 MCP messages."""
     return mcp_server.handle_message(payload)
 
@@ -497,10 +512,11 @@ def handle_mcp_rpc(payload: Dict[str, Any] = Body(...)):
 # v1 — Capability Pipelines
 # ---------------------------------------------------------------------------
 
+
 @app.post("/v1/pipelines/run", response_model=PipelineExecutionResponse, tags=["Pipelines"])
 def run_capability_pipeline(
     pipeline: CapabilityPipeline = Body(...),
-    initial_inputs: Dict[str, Any] = Body(default_factory=dict),
+    initial_inputs: dict[str, Any] = Body(default_factory=dict),
 ):
     """Execute a multi-step capability composition pipeline."""
     return pipeline_runner.run_pipeline(pipeline, initial_inputs)
@@ -510,10 +526,11 @@ def run_capability_pipeline(
 # v1 — OpenTelemetry Spans
 # ---------------------------------------------------------------------------
 
+
 @app.get("/v1/telemetry/spans", tags=["Telemetry"])
 def list_telemetry_spans(
-    trace_id: Optional[str] = Query(None),
-    name: Optional[str] = Query(None),
+    trace_id: str | None = Query(None),
+    name: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
 ):
     """Retrieve recorded distributed tracing spans."""
@@ -524,13 +541,14 @@ def list_telemetry_spans(
 # v1 — Governance Review Tickets Lifecycle
 # ---------------------------------------------------------------------------
 
+
 class TicketActionRequest(BaseModel):
     reviewer: str = "security_lead"
     notes: str = ""
 
 
-@app.get("/v1/governance/tickets", response_model=List[HumanReviewTicket], tags=["Governance"])
-def list_governance_tickets(status: Optional[str] = Query(None)):
+@app.get("/v1/governance/tickets", response_model=list[HumanReviewTicket], tags=["Governance"])
+def list_governance_tickets(status: str | None = Query(None)):
     """List audit tickets flagged for human review due to risk escalation or AST anomalies."""
     return risk_engine.list_tickets(status=status)
 
@@ -567,16 +585,17 @@ def reject_governance_ticket(ticket_id: str, req: TicketActionRequest = Body(...
 # v1 — Distributed Event Stream & Durable Workflows
 # ---------------------------------------------------------------------------
 
+
 class WorkflowRunRequest(BaseModel):
     workflow: WorkflowDefinition
-    inputs: Dict[str, Any] = Field(default_factory=dict)
-    run_id: Optional[str] = None
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    run_id: str | None = None
 
 
-@app.get("/v1/events/stream", response_model=List[StreamMessage], tags=["Events"])
+@app.get("/v1/events/stream", response_model=list[StreamMessage], tags=["Events"])
 def get_event_stream(
     topic_pattern: str = Query("*"),
-    since_timestamp: Optional[str] = Query(None),
+    since_timestamp: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
 ):
     """Query streamed agent events from the distributed event broker."""
@@ -597,7 +616,7 @@ def execute_workflow(req: WorkflowRunRequest):
     )
 
 
-@app.get("/v1/workflows", response_model=List[WorkflowExecutionState], tags=["Workflows"])
+@app.get("/v1/workflows", response_model=list[WorkflowExecutionState], tags=["Workflows"])
 def list_workflows(limit: int = Query(50, ge=1, le=100)):
     """List recent durable workflow runs and their status."""
     return durable_workflow_engine.list_workflow_runs(limit=limit)
@@ -625,11 +644,12 @@ def resume_workflow(run_id: str):
 # v1 — Hybrid Vector Retrieval & Enterprise Auth Mesh
 # ---------------------------------------------------------------------------
 
+
 class HybridSearchRequest(BaseModel):
     query: str
     alpha: float = 0.5
     top_k: int = 5
-    status: Optional[CapabilityStatus] = None
+    status: CapabilityStatus | None = None
 
 
 class HybridSearchResult(BaseModel):
@@ -648,7 +668,7 @@ class CreateKeyResponse(BaseModel):
     record: APIKeyRecord
 
 
-@app.post("/v1/capabilities/hybrid-search", response_model=List[HybridSearchResult], tags=["Search"])
+@app.post("/v1/capabilities/hybrid-search", response_model=list[HybridSearchResult], tags=["Search"])
 def hybrid_search_capabilities(req: HybridSearchRequest):
     """Hybrid lexical + dense vector semantic retrieval for capabilities."""
     results = vector_index.hybrid_search(
@@ -674,7 +694,7 @@ def create_api_key(
     return {"api_key": raw_token, "record": rec}
 
 
-@app.get("/v1/auth/keys", response_model=List[APIKeyRecord], tags=["Security & Auth"])
+@app.get("/v1/auth/keys", response_model=list[APIKeyRecord], tags=["Security & Auth"])
 def list_api_keys(
     current_user: APIKeyRecord = Depends(require_roles(UserRole.ADMIN, UserRole.OPERATOR)),
 ):
@@ -698,14 +718,15 @@ def revoke_api_key(
 # Backward Compatibility Routes
 # ---------------------------------------------------------------------------
 
+
 @app.post("/api/tasks/analyze", response_model=CapabilityGap, tags=["Legacy"], include_in_schema=False)
 def legacy_analyze_task_gap(req: TaskAnalyzeRequest):
     return gap_detector.evaluate_task(req.task_intent)
 
 
-@app.get("/api/capabilities", response_model=List[Capability], tags=["Legacy"], include_in_schema=False)
+@app.get("/api/capabilities", response_model=list[Capability], tags=["Legacy"], include_in_schema=False)
 def legacy_list_capabilities(
-    domain: Optional[str] = Query(None),
-    cap_status: Optional[CapabilityStatus] = Query(None, alias="status"),
+    domain: str | None = Query(None),
+    cap_status: CapabilityStatus | None = Query(None, alias="status"),
 ):
     return registry.list_capabilities(domain=domain, status=cap_status)

@@ -8,7 +8,6 @@ and cross-capability relationships for impact analysis.
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from typing import Dict, List, Optional, Set, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -18,19 +17,21 @@ from capforge.registry.store import CapabilityRegistry
 
 class GraphNode(BaseModel):
     """A node in the capability graph."""
+
     capability_id: str
     version: str
     capability_type: str
     domain: str
-    dependencies: List[str] = Field(default_factory=list)
-    dependents: List[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
+    dependents: list[str] = Field(default_factory=list)
 
 
 class ImpactReport(BaseModel):
     """Report of which capabilities are affected by a change."""
+
     changed_capability_id: str
-    directly_affected: List[str] = Field(default_factory=list)
-    transitively_affected: List[str] = Field(default_factory=list)
+    directly_affected: list[str] = Field(default_factory=list)
+    transitively_affected: list[str] = Field(default_factory=list)
     total_impact_count: int = 0
 
 
@@ -41,14 +42,14 @@ class CapabilityGraph:
     Reverse edges maintained for impact analysis.
     """
 
-    def __init__(self, registry: Optional[CapabilityRegistry] = None) -> None:
+    def __init__(self, registry: CapabilityRegistry | None = None) -> None:
         self.registry = registry
         # Forward edges: cap_id → set of dependency cap_ids
-        self._deps: Dict[str, Set[str]] = defaultdict(set)
+        self._deps: dict[str, set[str]] = defaultdict(set)
         # Reverse edges: cap_id → set of dependent cap_ids
-        self._rdeps: Dict[str, Set[str]] = defaultdict(set)
+        self._rdeps: dict[str, set[str]] = defaultdict(set)
         # Node metadata
-        self._nodes: Dict[str, GraphNode] = {}
+        self._nodes: dict[str, GraphNode] = {}
 
     def add_capability(self, capability: Capability) -> None:
         """Add a capability and its declared dependencies to the graph."""
@@ -85,17 +86,17 @@ class CapabilityGraph:
 
         self._nodes.pop(capability_id, None)
 
-    def get_dependencies(self, capability_id: str) -> List[str]:
+    def get_dependencies(self, capability_id: str) -> list[str]:
         """Get direct dependencies of a capability."""
         return list(self._deps.get(capability_id, set()))
 
-    def get_dependents(self, capability_id: str) -> List[str]:
+    def get_dependents(self, capability_id: str) -> list[str]:
         """Get capabilities that directly depend on this one."""
         return list(self._rdeps.get(capability_id, set()))
 
-    def get_transitive_dependents(self, capability_id: str) -> List[str]:
+    def get_transitive_dependents(self, capability_id: str) -> list[str]:
         """Get all transitively dependent capabilities (BFS)."""
-        visited: Set[str] = set()
+        visited: set[str] = set()
         queue: deque[str] = deque([capability_id])
 
         while queue:
@@ -138,18 +139,18 @@ class CapabilityGraph:
 
         return len(capabilities)
 
-    def get_node(self, capability_id: str) -> Optional[GraphNode]:
+    def get_node(self, capability_id: str) -> GraphNode | None:
         """Get the graph node for a capability."""
         return self._nodes.get(capability_id)
 
-    def get_all_nodes(self) -> List[GraphNode]:
+    def get_all_nodes(self) -> list[GraphNode]:
         """Get all nodes in the graph."""
         return list(self._nodes.values())
 
     def has_cycle(self) -> bool:
         """Check if the dependency graph contains a cycle."""
-        visited: Set[str] = set()
-        rec_stack: Set[str] = set()
+        visited: set[str] = set()
+        rec_stack: set[str] = set()
 
         def _dfs(node: str) -> bool:
             visited.add(node)

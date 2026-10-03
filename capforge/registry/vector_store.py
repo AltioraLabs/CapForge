@@ -9,7 +9,6 @@ from __future__ import annotations
 import hashlib
 import math
 import re
-from typing import Dict, List, Optional, Tuple
 
 from capforge.core.models import Capability, CapabilityStatus
 from capforge.registry.search import CapabilityMatcher
@@ -22,7 +21,7 @@ class DenseVectorEmbeddingEngine:
     def __init__(self, dimension: int = 128):
         self.dimension = dimension
 
-    def embed_text(self, text: str) -> List[float]:
+    def embed_text(self, text: str) -> list[float]:
         """Compute an L2-normalized dense embedding vector using multi-hash feature projection."""
         tokens = re.findall(r"\w+", text.lower())
         vec = [0.0] * self.dimension
@@ -40,7 +39,7 @@ class DenseVectorEmbeddingEngine:
             # Sub-word character trigrams for semantic morphological capture
             if len(token) >= 3:
                 for i in range(len(token) - 2):
-                    trigram = token[i:i+3]
+                    trigram = token[i : i + 3]
                     h_tri = int(hashlib.sha256(trigram.encode("utf-8")).hexdigest(), 16)
                     tri_idx = h_tri % self.dimension
                     tri_sign = 1.0 if ((h_tri >> 8) & 1) == 0 else -1.0
@@ -53,7 +52,7 @@ class DenseVectorEmbeddingEngine:
         return vec
 
     @staticmethod
-    def cosine_similarity(v1: List[float], v2: List[float]) -> float:
+    def cosine_similarity(v1: list[float], v2: list[float]) -> float:
         """Compute cosine similarity between two unit vectors."""
         if not v1 or not v2 or len(v1) != len(v2):
             return 0.0
@@ -71,12 +70,12 @@ class SemanticVectorIndex:
     def __init__(
         self,
         registry: CapabilityRegistry,
-        embedding_engine: Optional[DenseVectorEmbeddingEngine] = None,
+        embedding_engine: DenseVectorEmbeddingEngine | None = None,
     ):
         self.registry = registry
         self.engine = embedding_engine or DenseVectorEmbeddingEngine(dimension=128)
         self.matcher = CapabilityMatcher(registry)
-        self._vectors: Dict[str, List[float]] = {}  # capability_id -> vector
+        self._vectors: dict[str, list[float]] = {}  # capability_id -> vector
         self._build_index()
 
     def _build_index(self) -> None:
@@ -104,10 +103,10 @@ class SemanticVectorIndex:
         """Hook to call after registry.register() to keep index fresh."""
         self.index_capability(capability)
 
-    def search_vector(self, query: str, top_k: int = 5) -> List[Tuple[Capability, float]]:
+    def search_vector(self, query: str, top_k: int = 5) -> list[tuple[Capability, float]]:
         """Search capabilities purely using dense vector cosine similarity."""
         q_vec = self.engine.embed_text(query)
-        scores: List[Tuple[Capability, float]] = []
+        scores: list[tuple[Capability, float]] = []
 
         for cap_id, vec in self._vectors.items():
             cap = self.registry.get(cap_id)
@@ -123,8 +122,8 @@ class SemanticVectorIndex:
         query: str,
         alpha: float = 0.5,
         top_k: int = 5,
-        status: Optional[CapabilityStatus] = None,
-    ) -> List[Tuple[Capability, float]]:
+        status: CapabilityStatus | None = None,
+    ) -> list[tuple[Capability, float]]:
         """Hybrid retrieval blending lexical-fuzzy scores (1 - alpha) with dense vector scores (alpha)."""
         # Lexical matches
         lexical_raw = self.matcher.find_matches(query, threshold=0.0, limit=top_k * 3, status=status)
@@ -134,7 +133,7 @@ class SemanticVectorIndex:
         q_vec = self.engine.embed_text(query)
         caps = self.registry.list_capabilities(status=status)
 
-        hybrid_scores: List[Tuple[Capability, float]] = []
+        hybrid_scores: list[tuple[Capability, float]] = []
         for cap in caps:
             vec = self._vectors.get(cap.id)
             if not vec:

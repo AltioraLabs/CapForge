@@ -10,10 +10,11 @@ import abc
 import fnmatch
 import logging
 import threading
-import time
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from capforge.core.models import AgentEvent
@@ -23,11 +24,12 @@ logger = logging.getLogger("capforge.events.broker")
 
 class StreamMessage(BaseModel):
     """Enveloped event message residing in the stream buffer."""
+
     message_id: str = Field(default_factory=lambda: f"msg_{uuid.uuid4().hex[:12]}")
     topic: str
-    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
     event: AgentEvent
-    acknowledged_by: List[str] = Field(default_factory=list)
+    acknowledged_by: list[str] = Field(default_factory=list)
 
 
 class BaseEventBroker(abc.ABC):
@@ -52,9 +54,9 @@ class BaseEventBroker(abc.ABC):
     def replay(
         self,
         topic_pattern: str = "*",
-        since_timestamp: Optional[str] = None,
+        since_timestamp: str | None = None,
         limit: int = 100,
-    ) -> List[StreamMessage]:
+    ) -> list[StreamMessage]:
         """Replay historical messages from the stream matching the filter."""
         pass
 
@@ -69,8 +71,8 @@ class InMemoryStreamBroker(BaseEventBroker):
 
     def __init__(self, max_buffer_size: int = 10_000):
         self.max_buffer_size = max_buffer_size
-        self._buffer: List[StreamMessage] = []
-        self._subscribers: List[Dict[str, Any]] = []
+        self._buffer: list[StreamMessage] = []
+        self._subscribers: list[dict[str, Any]] = []
         self._lock = threading.RLock()
 
     def publish(self, topic: str, event: AgentEvent) -> str:
@@ -79,7 +81,7 @@ class InMemoryStreamBroker(BaseEventBroker):
         with self._lock:
             self._buffer.append(msg)
             if len(self._buffer) > self.max_buffer_size:
-                self._buffer = self._buffer[-self.max_buffer_size:]
+                self._buffer = self._buffer[-self.max_buffer_size :]
 
             active_subscribers = list(self._subscribers)
 
@@ -106,18 +108,20 @@ class InMemoryStreamBroker(BaseEventBroker):
         handler: Callable[[StreamMessage], None],
     ) -> None:
         with self._lock:
-            self._subscribers.append({
-                "pattern": topic_pattern,
-                "consumer_id": consumer_id,
-                "handler": handler,
-            })
+            self._subscribers.append(
+                {
+                    "pattern": topic_pattern,
+                    "consumer_id": consumer_id,
+                    "handler": handler,
+                }
+            )
 
     def replay(
         self,
         topic_pattern: str = "*",
-        since_timestamp: Optional[str] = None,
+        since_timestamp: str | None = None,
         limit: int = 100,
-    ) -> List[StreamMessage]:
+    ) -> list[StreamMessage]:
         with self._lock:
             results = []
             for msg in reversed(self._buffer):
@@ -148,7 +152,7 @@ class InMemoryStreamBroker(BaseEventBroker):
 
 class RedisStreamBroker(BaseEventBroker):
     """Resilient Redis Stream Broker with automatic in-memory fallback.
-    
+
     If Redis is installed and running, publishes events to Redis Streams.
     Otherwise gracefully falls back to an in-memory stream buffer.
     """
@@ -172,6 +176,7 @@ class RedisStreamBroker(BaseEventBroker):
     def _init_redis(self) -> None:
         try:
             import redis
+
             client = redis.from_url(self.redis_url, socket_timeout=1.0)
             client.ping()
             self._redis_client = client
@@ -196,7 +201,7 @@ class RedisStreamBroker(BaseEventBroker):
                     "agent_id": event.agent_id or "",
                     "run_id": event.run_id or "",
                     "payload": event.model_dump_json(),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
                 msg_id = self._redis_client.xadd(self.stream_key, msg_payload)
                 # Also mirror into local fallback broker for local in-process consumers
@@ -219,9 +224,9 @@ class RedisStreamBroker(BaseEventBroker):
     def replay(
         self,
         topic_pattern: str = "*",
-        since_timestamp: Optional[str] = None,
+        since_timestamp: str | None = None,
         limit: int = 100,
-    ) -> List[StreamMessage]:
+    ) -> list[StreamMessage]:
         return self._fallback_broker.replay(
             topic_pattern=topic_pattern,
             since_timestamp=since_timestamp,

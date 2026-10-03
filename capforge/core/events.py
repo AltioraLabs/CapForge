@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 from capforge.core.models import AgentEvent, EventType
 
@@ -20,10 +20,11 @@ logger = logging.getLogger("capforge.events")
 class EventGateway:
     """Receives, normalises, and dispatches agent events to registered handlers and stream brokers."""
 
-    def __init__(self, broker: Optional[Any] = None) -> None:
+    def __init__(self, broker: Any | None = None) -> None:
         from capforge.events.broker import InMemoryStreamBroker
-        self._handlers: Dict[EventType, List[Callable[[AgentEvent], None]]] = defaultdict(list)
-        self._event_log: List[AgentEvent] = []
+
+        self._handlers: dict[EventType, list[Callable[[AgentEvent], None]]] = defaultdict(list)
+        self._event_log: list[AgentEvent] = []
         self._max_log_size: int = 10_000
         self.broker = broker if broker is not None else InMemoryStreamBroker()
 
@@ -41,7 +42,7 @@ class EventGateway:
         # Store in log
         self._event_log.append(event)
         if len(self._event_log) > self._max_log_size:
-            self._event_log = self._event_log[-self._max_log_size:]
+            self._event_log = self._event_log[-self._max_log_size :]
 
         # Publish to distributed stream broker
         if self.broker is not None:
@@ -66,11 +67,11 @@ class EventGateway:
             except Exception:
                 logger.exception("Handler error for event %s", event.event_id)
 
-    def get_recent_events(self, limit: int = 50) -> List[AgentEvent]:
+    def get_recent_events(self, limit: int = 50) -> list[AgentEvent]:
         """Return the most recent events from the log."""
         return self._event_log[-limit:]
 
-    def get_events_by_run(self, run_id: str) -> List[AgentEvent]:
+    def get_events_by_run(self, run_id: str) -> list[AgentEvent]:
         """Return all events for a specific run."""
         return [e for e in self._event_log if e.run_id == run_id]
 
@@ -97,22 +98,26 @@ class ExperienceFilter:
     """
 
     # Events that always trigger learning evaluation
-    LEARN_EVENT_TYPES = frozenset({
-        EventType.CAPABILITY_GAP_DETECTED,
-        EventType.LEARNING_STARTED,
-        EventType.SKILL_CANDIDATE_CREATED,
-    })
+    LEARN_EVENT_TYPES = frozenset(
+        {
+            EventType.CAPABILITY_GAP_DETECTED,
+            EventType.LEARNING_STARTED,
+            EventType.SKILL_CANDIDATE_CREATED,
+        }
+    )
 
     # Events that may trigger learning depending on context
-    MAYBE_LEARN_EVENT_TYPES = frozenset({
-        EventType.TOOL_FAILED,
-        EventType.TASK_FAILED,
-        EventType.SKILL_FAILED,
-    })
+    MAYBE_LEARN_EVENT_TYPES = frozenset(
+        {
+            EventType.TOOL_FAILED,
+            EventType.TASK_FAILED,
+            EventType.SKILL_FAILED,
+        }
+    )
 
     def __init__(self, failure_threshold: int = 3) -> None:
         self.failure_threshold = failure_threshold
-        self._failure_counts: Dict[str, int] = defaultdict(int)
+        self._failure_counts: dict[str, int] = defaultdict(int)
         self._seen_errors: set[str] = set()
 
     def should_learn(self, event: AgentEvent) -> bool:

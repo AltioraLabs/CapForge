@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import Dict, List, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 from capforge.acquisition.jobs import LearningJob, LearningJobManager
@@ -31,10 +30,10 @@ class LearningJobWorker:
         self.poll_interval_sec = poll_interval_sec
 
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._executor = ThreadPoolExecutor(max_workers=self.max_workers)
-        self._active_jobs: Dict[str, LearningJob] = {}
+        self._active_jobs: dict[str, LearningJob] = {}
 
     def start(self) -> None:
         """Start the background worker polling thread."""

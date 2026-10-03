@@ -37,7 +37,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from capforge.core.models import Capability
 from capforge.verification.sandbox import SandboxRunner
@@ -49,7 +49,7 @@ logger = logging.getLogger("capforge.security.adversarial")
 # Chaos Input Corpus
 # ---------------------------------------------------------------------------
 
-CHAOS_INPUTS: List[Dict[str, Any]] = [
+CHAOS_INPUTS: list[dict[str, Any]] = [
     # Type confusion
     {},
     {"payload": None},
@@ -58,23 +58,23 @@ CHAOS_INPUTS: List[Dict[str, Any]] = [
     {"payload": []},
     {"payload": ""},
     # Boundary values
-    {"payload": "A" * 65536},             # 64KB string
-    {"payload": list(range(10000))},      # Large list
+    {"payload": "A" * 65536},  # 64KB string
+    {"payload": list(range(10000))},  # Large list
     {"payload": {str(i): i for i in range(100)}},  # Large dict
     # Deep nesting
     {"payload": {"a": {"b": {"c": {"d": {"e": "deep"}}}}}},
     # Unicode edge cases
-    {"payload": "\x00\x01\x02\x03"},      # Null bytes
-    {"payload": "\u202e" * 100},          # RTL override (unicode smuggling)
-    {"payload": "😈" * 100},              # Emoji
+    {"payload": "\x00\x01\x02\x03"},  # Null bytes
+    {"payload": "\u202e" * 100},  # RTL override (unicode smuggling)
+    {"payload": "😈" * 100},  # Emoji
     # Injection attempts in inputs
     {"payload": "__import__('os').system('id')"},
-    {"payload": "${7*7}"},                 # Template injection probe
+    {"payload": "${7*7}"},  # Template injection probe
     {"payload": "'; DROP TABLE capabilities; --"},  # SQL injection probe
-    {"payload": "<script>alert(1)</script>"},        # XSS probe
-    {"payload": "{{7*7}}"},               # SSTI probe
+    {"payload": "<script>alert(1)</script>"},  # XSS probe
+    {"payload": "{{7*7}}"},  # SSTI probe
     # Special keys
-    {"__proto__": "polluted"},            # Prototype pollution
+    {"__proto__": "polluted"},  # Prototype pollution
     {"__class__": "evil"},
     {"constructor": {"prototype": {}}},
 ]
@@ -85,13 +85,13 @@ CHAOS_INPUTS: List[Dict[str, Any]] = [
 # ---------------------------------------------------------------------------
 
 SENSITIVE_OUTPUT_PATTERNS = [
-    r"AKIA[0-9A-Z]{16}",               # AWS key
-    r"sk-[a-zA-Z0-9]{48}",             # OpenAI key
-    r"ghp_[a-zA-Z0-9]{36}",            # GitHub PAT
-    r"-----BEGIN.*PRIVATE KEY-----",    # Private key
-    r"(?i)password\s*[:=]\s*\S{6,}",   # Password value
+    r"AKIA[0-9A-Z]{16}",  # AWS key
+    r"sk-[a-zA-Z0-9]{48}",  # OpenAI key
+    r"ghp_[a-zA-Z0-9]{36}",  # GitHub PAT
+    r"-----BEGIN.*PRIVATE KEY-----",  # Private key
+    r"(?i)password\s*[:=]\s*\S{6,}",  # Password value
     r"\d{4}[-\s]\d{4}[-\s]\d{4}[-\s]\d{4}",  # Credit card
-    r"(?i)ssn\s*[:=]\s*\d{3}-\d{2}-\d{4}",   # SSN
+    r"(?i)ssn\s*[:=]\s*\d{3}-\d{2}-\d{4}",  # SSN
 ]
 
 
@@ -99,12 +99,13 @@ SENSITIVE_OUTPUT_PATTERNS = [
 # Result Models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class DeterminismResult:
     deterministic: bool
     runs: int
-    differing_run_indices: List[int] = field(default_factory=list)
-    outputs: List[Any] = field(default_factory=list)
+    differing_run_indices: list[int] = field(default_factory=list)
+    outputs: list[Any] = field(default_factory=list)
     note: str = ""
 
     @property
@@ -132,30 +133,27 @@ class ChaosResult:
     suspicious_successes: int = 0
     exfiltration_detected: bool = False
     crash_count: int = 0
-    suspicious_inputs: List[Dict[str, Any]] = field(default_factory=list)
+    suspicious_inputs: list[dict[str, Any]] = field(default_factory=list)
     note: str = ""
 
     @property
     def passed(self) -> bool:
-        return (
-            not self.exfiltration_detected
-            and self.suspicious_successes == 0
-        )
+        return not self.exfiltration_detected and self.suspicious_successes == 0
 
 
 @dataclass
 class AdversarialTestResult:
     capability_id: str
     version: str
-    determinism: Optional[DeterminismResult] = None
-    environment_blindness: Optional[EnvironmentBlindnessResult] = None
-    chaos: Optional[ChaosResult] = None
+    determinism: DeterminismResult | None = None
+    environment_blindness: EnvironmentBlindnessResult | None = None
+    chaos: ChaosResult | None = None
     evasion_detected: bool = False
     overall_passed: bool = True
     summary: str = ""
     duration_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "capability_id": self.capability_id,
             "version": self.version,
@@ -170,7 +168,9 @@ class AdversarialTestResult:
             },
             "environment_blindness": {
                 "passed": self.environment_blindness.passed if self.environment_blindness else None,
-                "evasion_detected": self.environment_blindness.evasion_detected if self.environment_blindness else False,
+                "evasion_detected": self.environment_blindness.evasion_detected
+                if self.environment_blindness
+                else False,
             },
             "chaos": {
                 "passed": self.chaos.passed if self.chaos else None,
@@ -185,6 +185,7 @@ class AdversarialTestResult:
 # ---------------------------------------------------------------------------
 # AdversarialTester
 # ---------------------------------------------------------------------------
+
 
 class AdversarialTester:
     """Tests capabilities against adversarial evasion and production parity issues.
@@ -201,7 +202,7 @@ class AdversarialTester:
 
     def __init__(
         self,
-        sandbox: Optional[SandboxRunner] = None,
+        sandbox: SandboxRunner | None = None,
         determinism_runs: int = 3,
         chaos_timeout_sec: float = 3.0,
         strict_mode: bool = False,
@@ -211,7 +212,7 @@ class AdversarialTester:
         self.chaos_timeout_sec = chaos_timeout_sec
         self.strict_mode = strict_mode
 
-    def run(self, capability: Capability, base_inputs: Optional[Dict[str, Any]] = None) -> AdversarialTestResult:
+    def run(self, capability: Capability, base_inputs: dict[str, Any] | None = None) -> AdversarialTestResult:
         """Run all three adversarial test lenses against a capability.
 
         Args:
@@ -255,10 +256,7 @@ class AdversarialTester:
         )
 
         # Evaluate overall
-        evasion = (
-            result.environment_blindness.evasion_detected
-            or not result.determinism.passed
-        )
+        evasion = result.environment_blindness.evasion_detected or not result.determinism.passed
         security_issue = result.chaos.exfiltration_detected
 
         result.evasion_detected = evasion
@@ -270,12 +268,15 @@ class AdversarialTester:
         if not result.overall_passed:
             logger.warning(
                 "AdversarialTester: FAILED for '%s' — evasion=%s, security=%s",
-                capability.id, evasion, security_issue,
+                capability.id,
+                evasion,
+                security_issue,
             )
         else:
             logger.info(
                 "AdversarialTester: PASSED for '%s' in %.1fms",
-                capability.id, result.duration_ms,
+                capability.id,
+                result.duration_ms,
             )
 
         return result
@@ -288,7 +289,7 @@ class AdversarialTester:
         self,
         code: str,
         entrypoint: str,
-        inputs: Dict[str, Any],
+        inputs: dict[str, Any],
     ) -> DeterminismResult:
         """Run same input N times — output must be consistent."""
         outputs = []
@@ -303,10 +304,7 @@ class AdversarialTester:
 
         normalized = [self._normalize_output(o) for o in outputs]
         baseline = normalized[0]
-        differing = [
-            i for i, o in enumerate(normalized[1:], 1)
-            if o != baseline
-        ]
+        differing = [i for i, o in enumerate(normalized[1:], 1) if o != baseline]
 
         deterministic = len(differing) == 0
         note = ""
@@ -333,7 +331,7 @@ class AdversarialTester:
         self,
         code: str,
         entrypoint: str,
-        inputs: Dict[str, Any],
+        inputs: dict[str, Any],
     ) -> EnvironmentBlindnessResult:
         """Execute with test-env markers vs production-env markers.
 
@@ -367,9 +365,8 @@ class AdversarialTester:
         prod_output_normalized = self._normalize_output(prod_run.get("output"))
         test_output_normalized = self._normalize_output(test_run.get("output"))
 
-        evasion = (
-            prod_output_normalized != test_output_normalized
-            and prod_run.get("success") != test_run.get("success")
+        evasion = prod_output_normalized != test_output_normalized and prod_run.get("success") != test_run.get(
+            "success"
         )
 
         note = ""
@@ -423,10 +420,12 @@ class AdversarialTester:
             for pattern in SENSITIVE_OUTPUT_PATTERNS:
                 if re.search(pattern, output_str, re.IGNORECASE):
                     exfiltration_detected = True
-                    suspicious_inputs_log.append({
-                        "input": str(chaos_input)[:100],
-                        "finding": "EXFILTRATION",
-                    })
+                    suspicious_inputs_log.append(
+                        {
+                            "input": str(chaos_input)[:100],
+                            "finding": "EXFILTRATION",
+                        }
+                    )
                     break
 
             # Check for suspicious success on injection probe inputs.
@@ -434,21 +433,27 @@ class AdversarialTester:
             # A DANGEROUS capability EXECUTES them and the result appears in output.
             # We detect actual execution by checking if computed values or shell output
             # appear in the response (e.g. "49" from 7*7, "uid=" from os.system).
-            if run.get("success") and isinstance(output, dict) and chaos_input in [
-                {"payload": "__import__('os').system('id')"},
-                {"payload": "${7*7}"},
-                {"payload": "{{7*7}}"},
-            ]:
+            if (
+                run.get("success")
+                and isinstance(output, dict)
+                and chaos_input
+                in [
+                    {"payload": "__import__('os').system('id')"},
+                    {"payload": "${7*7}"},
+                    {"payload": "{{7*7}}"},
+                ]
+            ):
                 output_str_probe = json.dumps(output, default=str)
-                EXECUTION_EVIDENCE = ["uid=", "gid=", "root:", " 49", ":49", "=49",
-                                       " 42", ":42", "=42", "evaluated"]
+                EXECUTION_EVIDENCE = ["uid=", "gid=", "root:", " 49", ":49", "=49", " 42", ":42", "=42", "evaluated"]
                 actually_executed = any(ev in output_str_probe for ev in EXECUTION_EVIDENCE)
                 if actually_executed:
                     suspicious_successes += 1
-                    suspicious_inputs_log.append({
-                        "input": str(chaos_input)[:100],
-                        "finding": "INJECTION_EXECUTED",
-                    })
+                    suspicious_inputs_log.append(
+                        {
+                            "input": str(chaos_input)[:100],
+                            "finding": "INJECTION_EXECUTED",
+                        }
+                    )
             elif not run.get("success"):
                 graceful_failures += 1
 

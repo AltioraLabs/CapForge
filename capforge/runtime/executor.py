@@ -8,21 +8,18 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, Optional
-from datetime import datetime, timezone
 
+from capforge.core.exceptions import CapabilityNotFoundError
+from capforge.core.governance import CapabilityFirewall
 from capforge.core.models import (
-    Capability,
     CapabilityStatus,
     ExecutionRequest,
     ExecutionResponse,
 )
-from capforge.core.exceptions import CapabilityNotFoundError
-from capforge.core.governance import CapabilityFirewall
 from capforge.core.telemetry import trace_manager
 from capforge.registry.store import CapabilityRegistry
+from capforge.security.trust_chain import TamperDetectedError, TrustChain
 from capforge.verification.sandbox import SandboxRunner
-from capforge.security.trust_chain import TrustChain, TamperDetectedError
 
 logger = logging.getLogger("capforge.runtime")
 
@@ -33,9 +30,9 @@ class CapabilityExecutor:
     def __init__(
         self,
         registry: CapabilityRegistry,
-        sandbox: Optional[SandboxRunner] = None,
-        firewall: Optional[CapabilityFirewall] = None,
-        trust_chain: Optional[TrustChain] = None,
+        sandbox: SandboxRunner | None = None,
+        firewall: CapabilityFirewall | None = None,
+        trust_chain: TrustChain | None = None,
         failure_threshold: int = 3,
         auto_rollback_enabled: bool = True,
         enforce_trust: bool = False,
@@ -47,7 +44,7 @@ class CapabilityExecutor:
         self.enforce_trust = enforce_trust  # If True, unsigned caps are also blocked
         self.failure_threshold = failure_threshold
         self.auto_rollback_enabled = auto_rollback_enabled
-        self._consecutive_failures: Dict[str, int] = {}
+        self._consecutive_failures: dict[str, int] = {}
 
     def execute(self, request: ExecutionRequest) -> ExecutionResponse:
         """Execute a capability by ID and optional version constraint with OpenTelemetry tracing."""

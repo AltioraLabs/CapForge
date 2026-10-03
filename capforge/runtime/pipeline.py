@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from capforge.core.models import ExecutionRequest, ExecutionResponse
@@ -20,24 +21,26 @@ logger = logging.getLogger("capforge.runtime.pipeline")
 
 class PipelineStep(BaseModel):
     """Specification of a single step within a capability pipeline."""
+
     step_id: str
     capability_id: str
-    version: Optional[str] = None
-    input_mappings: Dict[str, Any] = Field(
+    version: str | None = None
+    input_mappings: dict[str, Any] = Field(
         default_factory=dict,
         description="Maps step input parameters to literal values, '$inputs.<key>', or '$steps.<step_id>.output.<key>'",
     )
     continue_on_failure: bool = False
-    fallback_capability_id: Optional[str] = None
+    fallback_capability_id: str | None = None
 
 
 class CapabilityPipeline(BaseModel):
     """A multi-step capability execution DAG."""
+
     pipeline_id: str
     name: str
     description: str = ""
-    steps: List[PipelineStep] = Field(default_factory=list)
-    output_mappings: Dict[str, str] = Field(
+    steps: list[PipelineStep] = Field(default_factory=list)
+    output_mappings: dict[str, str] = Field(
         default_factory=dict,
         description="Maps pipeline output keys to '$steps.<step_id>.output.<key>' or '$inputs.<key>'",
     )
@@ -45,12 +48,13 @@ class CapabilityPipeline(BaseModel):
 
 class PipelineExecutionResponse(BaseModel):
     """Result of running a multi-step capability pipeline."""
+
     pipeline_id: str
     status: str  # "SUCCESS" | "FAILED" | "PARTIAL"
     total_execution_time_ms: float
-    final_output: Dict[str, Any] = Field(default_factory=dict)
-    step_results: Dict[str, ExecutionResponse] = Field(default_factory=dict)
-    error: Optional[str] = None
+    final_output: dict[str, Any] = Field(default_factory=dict)
+    step_results: dict[str, ExecutionResponse] = Field(default_factory=dict)
+    error: str | None = None
 
 
 class CapabilityPipelineRunner:
@@ -62,12 +66,12 @@ class CapabilityPipelineRunner:
     def run_pipeline(
         self,
         pipeline: CapabilityPipeline,
-        initial_inputs: Dict[str, Any],
+        initial_inputs: dict[str, Any],
         timeout_sec: float = 60.0,
     ) -> PipelineExecutionResponse:
         """Execute all steps in pipeline in topological order."""
         start_time = time.perf_counter()
-        step_results: Dict[str, ExecutionResponse] = {}
+        step_results: dict[str, ExecutionResponse] = {}
         all_success = True
 
         for step in pipeline.steps:
@@ -132,12 +136,12 @@ class CapabilityPipelineRunner:
 
     def _resolve_inputs(
         self,
-        mappings: Dict[str, Any],
-        initial_inputs: Dict[str, Any],
-        step_results: Dict[str, ExecutionResponse],
-    ) -> Dict[str, Any]:
+        mappings: dict[str, Any],
+        initial_inputs: dict[str, Any],
+        step_results: dict[str, ExecutionResponse],
+    ) -> dict[str, Any]:
         """Interpolate variables like $inputs.key or $steps.step1.output.field."""
-        resolved: Dict[str, Any] = {}
+        resolved: dict[str, Any] = {}
         for param, mapping in mappings.items():
             if isinstance(mapping, str) and mapping.startswith("$"):
                 resolved[param] = self._resolve_expression(mapping, initial_inputs, step_results)
@@ -147,12 +151,12 @@ class CapabilityPipelineRunner:
 
     def _resolve_outputs(
         self,
-        mappings: Dict[str, str],
-        initial_inputs: Dict[str, Any],
-        step_results: Dict[str, ExecutionResponse],
-    ) -> Dict[str, Any]:
+        mappings: dict[str, str],
+        initial_inputs: dict[str, Any],
+        step_results: dict[str, ExecutionResponse],
+    ) -> dict[str, Any]:
         """Construct final pipeline dictionary from declared output mappings."""
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for out_key, expr in mappings.items():
             out[out_key] = self._resolve_expression(expr, initial_inputs, step_results)
         return out
@@ -160,8 +164,8 @@ class CapabilityPipelineRunner:
     def _resolve_expression(
         self,
         expr: str,
-        initial_inputs: Dict[str, Any],
-        step_results: Dict[str, ExecutionResponse],
+        initial_inputs: dict[str, Any],
+        step_results: dict[str, ExecutionResponse],
     ) -> Any:
         """Resolve a dotted path expression."""
         if not expr.startswith("$"):

@@ -7,7 +7,7 @@ and orchestrates the closed-loop repair cycle until verification gates pass.
 from __future__ import annotations
 
 import re
-from typing import Tuple
+
 from capforge.core.models import Capability, VerificationResult
 from capforge.verification.evaluator import CapabilityEvaluator
 
@@ -19,12 +19,9 @@ class AutoRepairEngine:
         self.evaluator = evaluator or CapabilityEvaluator()
         self.max_iterations = max_iterations
 
-    def repair_until_pass(
-        self,
-        capability: Capability
-    ) -> Tuple[Capability, VerificationResult, int]:
+    def repair_until_pass(self, capability: Capability) -> tuple[Capability, VerificationResult, int]:
         """Iteratively diagnose, patch, and re-evaluate candidate capability.
-        
+
         Returns (repaired_capability, final_verification_result, iterations_taken).
         """
         current_cap = capability.model_copy(deep=True)
@@ -61,27 +58,23 @@ class AutoRepairEngine:
             if "keyerror" in err or "missing_api_key" in err or "none" in err:
                 if "inputs.get(" not in patched and "inputs[" in patched:
                     patched = re.sub(r'inputs\["([^"]+)"\]', r'inputs.get("\1")', patched)
-                
+
                 # Ensure graceful return if inputs are empty
-                guard_code = '''
+                guard_code = """
     if not inputs:
         return {"status": "FAILED", "error": "EMPTY_INPUTS", "records": [], "summary": {}}
-'''.strip()
+""".strip()
                 if "if not inputs:" not in patched:
                     # Insert after def execute
-                    patched = re.sub(
-                        r"(def execute\([^)]*\):)",
-                        r"\1\n    " + guard_code,
-                        patched
-                    )
+                    patched = re.sub(r"(def execute\([^)]*\):)", r"\1\n    " + guard_code, patched)
 
             # Case 2: Output shape mismatch (records or summary missing)
             if "expected key 'records' missing" in err:
                 # Ensure all return dicts have 'records'
                 patched = re.sub(
-                    r'return\s+\{([^}]+)\}',
+                    r"return\s+\{([^}]+)\}",
                     r'res = {\1}\n    if "records" not in res: res["records"] = []\n    return res',
-                    patched
+                    patched,
                 )
 
             # Case 3: Output not a dict

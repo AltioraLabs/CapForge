@@ -41,7 +41,7 @@ import logging
 import math
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 logger = logging.getLogger("capforge.security.guardian")
 
@@ -50,7 +50,7 @@ logger = logging.getLogger("capforge.security.guardian")
 # ---------------------------------------------------------------------------
 
 # Imports that are never allowed — hard block
-FORBIDDEN_IMPORTS: Set[str] = {
+FORBIDDEN_IMPORTS: set[str] = {
     "subprocess",
     "ctypes",
     "cffi",
@@ -76,38 +76,95 @@ FORBIDDEN_IMPORTS: Set[str] = {
 
 # Imports that are allowed (stdlib + common libraries)
 # Anything NOT in this set is flagged as UNKNOWN_IMPORT (warning, not hard block)
-ALLOWED_IMPORTS: Set[str] = {
+ALLOWED_IMPORTS: set[str] = {
     # Stdlib — data processing
-    "json", "re", "math", "decimal", "fractions", "statistics", "random",
-    "datetime", "calendar", "time", "zoneinfo",
+    "json",
+    "re",
+    "math",
+    "decimal",
+    "fractions",
+    "statistics",
+    "random",
+    "datetime",
+    "calendar",
+    "time",
+    "zoneinfo",
     # Stdlib — collections
-    "collections", "itertools", "functools", "operator", "copy", "pprint",
-    "heapq", "bisect", "queue", "weakref",
+    "collections",
+    "itertools",
+    "functools",
+    "operator",
+    "copy",
+    "pprint",
+    "heapq",
+    "bisect",
+    "queue",
+    "weakref",
     # Stdlib — typing
-    "typing", "typing_extensions", "dataclasses", "abc", "enum",
+    "typing",
+    "typing_extensions",
+    "dataclasses",
+    "abc",
+    "enum",
     # Stdlib — text
-    "string", "textwrap", "difflib", "html", "xml.etree.ElementTree",
-    "csv", "configparser", "io", "struct",
+    "string",
+    "textwrap",
+    "difflib",
+    "html",
+    "xml.etree.ElementTree",
+    "csv",
+    "configparser",
+    "io",
+    "struct",
     # Stdlib — networking (READ only)
-    "urllib.parse", "urllib.request", "http.client", "email",
-    "base64", "binascii", "hashlib", "hmac", "secrets",
+    "urllib.parse",
+    "urllib.request",
+    "http.client",
+    "email",
+    "base64",
+    "binascii",
+    "hashlib",
+    "hmac",
+    "secrets",
     # Stdlib — filesystem (READ only - write is caught in Layer 2)
-    "pathlib", "os.path", "glob", "fnmatch", "tempfile",
+    "pathlib",
+    "os.path",
+    "glob",
+    "fnmatch",
+    "tempfile",
     # Stdlib — compression
-    "zipfile", "tarfile", "gzip", "bz2", "lzma", "zlib",
+    "zipfile",
+    "tarfile",
+    "gzip",
+    "bz2",
+    "lzma",
+    "zlib",
     # Stdlib — logging
-    "logging", "warnings", "traceback",
+    "logging",
+    "warnings",
+    "traceback",
     # Stdlib — introspection (safe subset)
-    "inspect", "sys", "platform",
+    "inspect",
+    "sys",
+    "platform",
     # Common allowed third-party
-    "httpx", "requests", "aiohttp",
-    "pydantic", "attr", "attrs",
-    "yaml", "toml",
-    "numpy", "pandas", "scipy",
+    "httpx",
+    "requests",
+    "aiohttp",
+    "pydantic",
+    "attr",
+    "attrs",
+    "yaml",
+    "toml",
+    "numpy",
+    "pandas",
+    "scipy",
     "sqlalchemy",
     "redis",
-    "boto3", "botocore",
-    "azure", "google.cloud",
+    "boto3",
+    "botocore",
+    "azure",
+    "google.cloud",
 }
 
 # ---------------------------------------------------------------------------
@@ -117,58 +174,74 @@ ALLOWED_IMPORTS: Set[str] = {
 # AST node types that indicate dangerous runtime manipulation
 DANGEROUS_AST_PATTERNS = [
     # Dynamic code execution — CRITICAL: these allow arbitrary code injection
-    ("Call:eval", lambda node: (
-        isinstance(node, ast.Call) and
-        isinstance(node.func, ast.Name) and
-        node.func.id == "eval"
-    ), "CODE_EVAL", "CRITICAL"),
-    ("Call:exec", lambda node: (
-        isinstance(node, ast.Call) and
-        isinstance(node.func, ast.Name) and
-        node.func.id == "exec"
-    ), "CODE_EXEC", "CRITICAL"),
-    ("Call:compile", lambda node: (
-        isinstance(node, ast.Call) and
-        isinstance(node.func, ast.Name) and
-        node.func.id == "compile"
-    ), "CODE_COMPILE", "MEDIUM"),
-    ("Call:__import__", lambda node: (
-        isinstance(node, ast.Call) and
-        isinstance(node.func, ast.Name) and
-        node.func.id == "__import__"
-    ), "DYNAMIC_IMPORT", "CRITICAL"),
+    (
+        "Call:eval",
+        lambda node: isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "eval",
+        "CODE_EVAL",
+        "CRITICAL",
+    ),
+    (
+        "Call:exec",
+        lambda node: isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "exec",
+        "CODE_EXEC",
+        "CRITICAL",
+    ),
+    (
+        "Call:compile",
+        lambda node: isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "compile",
+        "CODE_COMPILE",
+        "MEDIUM",
+    ),
+    (
+        "Call:__import__",
+        lambda node: isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "__import__",
+        "DYNAMIC_IMPORT",
+        "CRITICAL",
+    ),
     # Dunder manipulation — class hierarchy access for sandbox escape
-    ("Attr:__subclasses__", lambda node: (
-        isinstance(node, ast.Attribute) and
-        node.attr == "__subclasses__"
-    ), "CLASS_SUBCLASS_ENUM", "CRITICAL"),
-    ("Attr:__bases__", lambda node: (
-        isinstance(node, ast.Attribute) and
-        node.attr in ("__bases__", "__mro__", "__class__")
-    ), "CLASS_MANIPULATION", "HIGH"),
-    ("Attr:__globals__", lambda node: (
-        isinstance(node, ast.Attribute) and
-        node.attr == "__globals__"
-    ), "GLOBALS_ACCESS", "CRITICAL"),
-    ("Attr:__builtins__", lambda node: (
-        isinstance(node, ast.Attribute) and
-        node.attr == "__builtins__"
-    ), "BUILTINS_ACCESS", "HIGH"),
-    ("Attr:__code__", lambda node: (
-        isinstance(node, ast.Attribute) and
-        node.attr in ("__code__", "__func__", "__closure__")
-    ), "CODE_OBJECT_ACCESS", "HIGH"),
+    (
+        "Attr:__subclasses__",
+        lambda node: isinstance(node, ast.Attribute) and node.attr == "__subclasses__",
+        "CLASS_SUBCLASS_ENUM",
+        "CRITICAL",
+    ),
+    (
+        "Attr:__bases__",
+        lambda node: isinstance(node, ast.Attribute) and node.attr in ("__bases__", "__mro__", "__class__"),
+        "CLASS_MANIPULATION",
+        "HIGH",
+    ),
+    (
+        "Attr:__globals__",
+        lambda node: isinstance(node, ast.Attribute) and node.attr == "__globals__",
+        "GLOBALS_ACCESS",
+        "CRITICAL",
+    ),
+    (
+        "Attr:__builtins__",
+        lambda node: isinstance(node, ast.Attribute) and node.attr == "__builtins__",
+        "BUILTINS_ACCESS",
+        "HIGH",
+    ),
+    (
+        "Attr:__code__",
+        lambda node: isinstance(node, ast.Attribute) and node.attr in ("__code__", "__func__", "__closure__"),
+        "CODE_OBJECT_ACCESS",
+        "HIGH",
+    ),
     # Global/local scope manipulation
-    ("Call:globals", lambda node: (
-        isinstance(node, ast.Call) and
-        isinstance(node.func, ast.Name) and
-        node.func.id == "globals"
-    ), "GLOBALS_CALL", "HIGH"),
-    ("Call:vars", lambda node: (
-        isinstance(node, ast.Call) and
-        isinstance(node.func, ast.Name) and
-        node.func.id == "vars"
-    ), "VARS_CALL", "MEDIUM"),
+    (
+        "Call:globals",
+        lambda node: isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "globals",
+        "GLOBALS_CALL",
+        "HIGH",
+    ),
+    (
+        "Call:vars",
+        lambda node: isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "vars",
+        "VARS_CALL",
+        "MEDIUM",
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -177,39 +250,34 @@ DANGEROUS_AST_PATTERNS = [
 
 DANGEROUS_REGEX_PATTERNS = [
     # Subprocess — all variants
-    (r"subprocess\s*\.\s*(run|Popen|call|check_output|check_call|getoutput|getstatusoutput)",
-     "SUBPROCESS_EXEC", "CRITICAL"),
-    (r"os\s*\.\s*(system|popen|execv|execve|execvp|execle|spawnl|spawnle)\s*\(",
-     "OS_EXEC", "CRITICAL"),
+    (
+        r"subprocess\s*\.\s*(run|Popen|call|check_output|check_call|getoutput|getstatusoutput)",
+        "SUBPROCESS_EXEC",
+        "CRITICAL",
+    ),
+    (r"os\s*\.\s*(system|popen|execv|execve|execvp|execle|spawnl|spawnle)\s*\(", "OS_EXEC", "CRITICAL"),
     # File writing — should not write arbitrary files
-    (r"open\s*\([^)]*['\"]w[a+b]*['\"]",
-     "FILE_WRITE", "HIGH"),
+    (r"open\s*\([^)]*['\"]w[a+b]*['\"]", "FILE_WRITE", "HIGH"),
     # Native code via ctypes/cffi
-    (r"ctypes\s*\.\s*(cdll|windll|CDLL|WinDLL|CFUNCTYPE|cast)",
-     "NATIVE_CODE", "CRITICAL"),
+    (r"ctypes\s*\.\s*(cdll|windll|CDLL|WinDLL|CFUNCTYPE|cast)", "NATIVE_CODE", "CRITICAL"),
     # Deserialization attacks
-    (r"pickle\s*\.\s*(loads|load)\s*\(",
-     "PICKLE_DESER", "CRITICAL"),
-    (r"marshal\s*\.\s*(loads|load)\s*\(",
-     "MARSHAL_DESER", "CRITICAL"),
-    (r"yaml\s*\.\s*load\s*\([^,)]+\)",  # yaml.load without Loader
-     "UNSAFE_YAML", "HIGH"),
+    (r"pickle\s*\.\s*(loads|load)\s*\(", "PICKLE_DESER", "CRITICAL"),
+    (r"marshal\s*\.\s*(loads|load)\s*\(", "MARSHAL_DESER", "CRITICAL"),
+    (
+        r"yaml\s*\.\s*load\s*\([^,)]+\)",  # yaml.load without Loader
+        "UNSAFE_YAML",
+        "HIGH",
+    ),
     # Obfuscated execution — chr() concatenation, base64 decode + exec
-    (r"chr\s*\(\d+\)\s*\+\s*chr\s*\(",
-     "CHAR_OBFUSCATION", "HIGH"),
-    (r"base64\s*\.\s*b64decode.*exec",
-     "BASE64_EXEC", "CRITICAL"),
+    (r"chr\s*\(\d+\)\s*\+\s*chr\s*\(", "CHAR_OBFUSCATION", "HIGH"),
+    (r"base64\s*\.\s*b64decode.*exec", "BASE64_EXEC", "CRITICAL"),
     # Environment variable enumeration (could harvest secrets)
-    (r"os\s*\.\s*environ(?!\s*\.get\s*\(['\"](?:CAPFORGE|HOME|PATH|LANG))",
-     "ENV_ENUM", "MEDIUM"),
-    (r"os\s*\.\s*environ\s*\.\s*items\s*\(",
-     "ENV_ENUM_ALL", "HIGH"),
+    (r"os\s*\.\s*environ(?!\s*\.get\s*\(['\"](?:CAPFORGE|HOME|PATH|LANG))", "ENV_ENUM", "MEDIUM"),
+    (r"os\s*\.\s*environ\s*\.\s*items\s*\(", "ENV_ENUM_ALL", "HIGH"),
     # Network to unexpected endpoints (only httpx/requests with explicit URL is OK)
-    (r"socket\s*\.\s*(connect|create_connection|bind)",
-     "RAW_SOCKET", "HIGH"),
+    (r"socket\s*\.\s*(connect|create_connection|bind)", "RAW_SOCKET", "HIGH"),
     # Timing channels — exfiltration via timing
-    (r"time\s*\.\s*sleep\s*\(\s*len\s*\(",
-     "TIMING_CHANNEL", "MEDIUM"),
+    (r"time\s*\.\s*sleep\s*\(\s*len\s*\(", "TIMING_CHANNEL", "MEDIUM"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -219,35 +287,55 @@ DANGEROUS_REGEX_PATTERNS = [
 # Code that detects it is in a test/sandbox environment and changes behavior
 EVASION_PATTERNS = [
     # Direct env var checks for test markers -- all forms caught:
-    # os.environ.get('PYTEST'), os.getenv('PYTEST'), os.environ['PYTEST']
-    (r"(?:os\.environ\.get|os\.getenv)\s*\(\s*['\"](?:PYTEST|TESTING|TEST_MODE|CI|SANDBOX|GITHUB_ACTIONS|GITLAB_CI|JENKINS|TRAVIS|CIRCLECI)['\"]"
-     r"|os\.environ\s*\[\s*['\"](?:PYTEST|TESTING|TEST_MODE|CI|SANDBOX|GITHUB_ACTIONS|GITLAB_CI|JENKINS|TRAVIS|CIRCLECI)['\"]",
-     "ENV_FINGERPRINTING", "CRITICAL",
-     "Code checks for test/CI environment markers -- possible sandbox evasion"),
-        # sys.argv inspection (could detect pytest runner)
-    (r"sys\s*\.\s*argv.*pytest|pytest.*sys\s*\.\s*argv",
-     "ARGV_FINGERPRINTING", "HIGH",
-     "Code inspects sys.argv for pytest — possible sandbox evasion"),
+    (
+        r"(?:os\.environ\.get|os\.getenv)\s*\(\s*['\"](?:PYTEST|TESTING|TEST_MODE|CI|SANDBOX|GITHUB_ACTIONS|GITLAB_CI|JENKINS|TRAVIS|CIRCLECI)['\"]"
+        r"|os\.environ\s*\[\s*['\"](?:PYTEST|TESTING|TEST_MODE|CI|SANDBOX|GITHUB_ACTIONS|GITLAB_CI|JENKINS|TRAVIS|CIRCLECI)['\"]",
+        "ENV_FINGERPRINTING",
+        "CRITICAL",
+        "Code checks for test/CI environment markers -- possible sandbox evasion",
+    ),
+    # sys.argv inspection (could detect pytest runner)
+    (
+        r"sys\s*\.\s*argv.*pytest|pytest.*sys\s*\.\s*argv",
+        "ARGV_FINGERPRINTING",
+        "HIGH",
+        "Code inspects sys.argv for pytest — possible sandbox evasion",
+    ),
     # Hostname / network topology checks
-    (r"socket\s*\.\s*gethostname\s*\(\s*\)",
-     "HOSTNAME_CHECK", "MEDIUM",
-     "Code checks hostname — possible environment fingerprinting"),
+    (
+        r"socket\s*\.\s*gethostname\s*\(\s*\)",
+        "HOSTNAME_CHECK",
+        "MEDIUM",
+        "Code checks hostname — possible environment fingerprinting",
+    ),
     # File existence checks for well-known CI paths
-    (r"os\s*\.\s*path\s*\.\s*exists\s*\(['\"](?:/proc/|/sys/|/var/run/docker)",
-     "CONTAINER_DETECT", "HIGH",
-     "Code probes for container/CI filesystem markers"),
+    (
+        r"os\s*\.\s*path\s*\.\s*exists\s*\(['\"](?:/proc/|/sys/|/var/run/docker)",
+        "CONTAINER_DETECT",
+        "HIGH",
+        "Code probes for container/CI filesystem markers",
+    ),
     # Counter-based triggers (behave normally for first N calls, then activate)
-    (r"(?:_count|_calls|_invocations)\s*(?:>=|>)\s*\d+",
-     "COUNTER_TRIGGER", "MEDIUM",
-     "Possible counter-based conditional activation"),
+    (
+        r"(?:_count|_calls|_invocations)\s*(?:>=|>)\s*\d+",
+        "COUNTER_TRIGGER",
+        "MEDIUM",
+        "Possible counter-based conditional activation",
+    ),
     # Timestamp bombs
-    (r"(?:time\s*\.\s*time|datetime\.now)\s*\(\s*\)\s*[><!]=?\s*\d{10}",
-     "TIMESTAMP_BOMB", "HIGH",
-     "Possible time-based conditional activation"),
+    (
+        r"(?:time\s*\.\s*time|datetime\.now)\s*\(\s*\)\s*[><!]=?\s*\d{10}",
+        "TIMESTAMP_BOMB",
+        "HIGH",
+        "Possible time-based conditional activation",
+    ),
     # Probabilistic triggers (random() < 0.01 — activates ~1% of the time)
-    (r"random\s*\.\s*(?:random|uniform)\s*\(\s*\)\s*<\s*0\.\d{1,3}[^5-9]",
-     "PROBABILISTIC_TRIGGER", "HIGH",
-     "Possible low-probability conditional trigger — stochastic evasion"),
+    (
+        r"random\s*\.\s*(?:random|uniform)\s*\(\s*\)\s*<\s*0\.\d{1,3}[^5-9]",
+        "PROBABILISTIC_TRIGGER",
+        "HIGH",
+        "Possible low-probability conditional trigger — stochastic evasion",
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -255,26 +343,20 @@ EVASION_PATTERNS = [
 # ---------------------------------------------------------------------------
 
 SECRET_PATTERNS = [
-    (r"(?i)(?:api_key|secret_key|private_key|password|passwd|auth_token|access_token)\s*=\s*['\"][a-zA-Z0-9+/=_\-]{16,}['\"]",
-     "HARDCODED_SECRET", "CRITICAL"),
-    (r"sk-[a-zA-Z0-9]{48}",
-     "OPENAI_API_KEY", "CRITICAL"),
-    (r"sk-proj-[a-zA-Z0-9_\-]{40,}",
-     "OPENAI_PROJECT_KEY", "CRITICAL"),
-    (r"ghp_[a-zA-Z0-9]{36}",
-     "GITHUB_PAT", "CRITICAL"),
-    (r"ghs_[a-zA-Z0-9]{36}",
-     "GITHUB_APP_TOKEN", "CRITICAL"),
-    (r"AKIA[0-9A-Z]{16}",
-     "AWS_ACCESS_KEY", "CRITICAL"),
-    (r"[0-9a-f]{40}",
-     "POSSIBLE_SECRET_HEX", "LOW"),  # Could be SHA-1; low severity
-    (r"(?i)bearer\s+[a-zA-Z0-9._\-]{20,}",
-     "BEARER_TOKEN", "HIGH"),
-    (r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
-     "PRIVATE_KEY_BLOCK", "CRITICAL"),
-    (r"(?i)jdbc:[a-zA-Z]+://[^\s'\"]+:[^\s'\"]+@",
-     "DB_CONNECTION_STRING", "CRITICAL"),
+    (
+        r"(?i)(?:api_key|secret_key|private_key|password|passwd|auth_token|access_token)\s*=\s*['\"][a-zA-Z0-9+/=_\-]{16,}['\"]",
+        "HARDCODED_SECRET",
+        "CRITICAL",
+    ),
+    (r"sk-[a-zA-Z0-9]{48}", "OPENAI_API_KEY", "CRITICAL"),
+    (r"sk-proj-[a-zA-Z0-9_\-]{40,}", "OPENAI_PROJECT_KEY", "CRITICAL"),
+    (r"ghp_[a-zA-Z0-9]{36}", "GITHUB_PAT", "CRITICAL"),
+    (r"ghs_[a-zA-Z0-9]{36}", "GITHUB_APP_TOKEN", "CRITICAL"),
+    (r"AKIA[0-9A-Z]{16}", "AWS_ACCESS_KEY", "CRITICAL"),
+    (r"[0-9a-f]{40}", "POSSIBLE_SECRET_HEX", "LOW"),  # Could be SHA-1; low severity
+    (r"(?i)bearer\s+[a-zA-Z0-9._\-]{20,}", "BEARER_TOKEN", "HIGH"),
+    (r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----", "PRIVATE_KEY_BLOCK", "CRITICAL"),
+    (r"(?i)jdbc:[a-zA-Z]+://[^\s'\"]+:[^\s'\"]+@", "DB_CONNECTION_STRING", "CRITICAL"),
 ]
 
 
@@ -282,23 +364,24 @@ SECRET_PATTERNS = [
 # Result Models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SecurityViolation:
     layer: int
     violation_type: str
     severity: str  # LOW, MEDIUM, HIGH, CRITICAL
     description: str
-    line_number: Optional[int] = None
-    snippet: Optional[str] = None
+    line_number: int | None = None
+    snippet: str | None = None
 
 
 @dataclass
 class GuardianScanResult:
     capability_id: str
     code_sha256: str
-    violations: List[SecurityViolation] = field(default_factory=list)
-    unknown_imports: List[str] = field(default_factory=list)
-    forbidden_imports: List[str] = field(default_factory=list)
+    violations: list[SecurityViolation] = field(default_factory=list)
+    unknown_imports: list[str] = field(default_factory=list)
+    forbidden_imports: list[str] = field(default_factory=list)
     blocked: bool = False
     summary: str = ""
 
@@ -310,7 +393,7 @@ class GuardianScanResult:
     def high_count(self) -> int:
         return sum(1 for v in self.violations if v.severity == "HIGH")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "capability_id": self.capability_id,
             "code_sha256": self.code_sha256,
@@ -338,6 +421,7 @@ class GuardianScanResult:
 # CodeGuardian
 # ---------------------------------------------------------------------------
 
+
 class CodeGuardian:
     """Multi-layer static security analysis for LLM-synthesized capability code.
 
@@ -356,8 +440,8 @@ class CodeGuardian:
         block_on_critical: bool = True,
         block_on_high: bool = False,
         block_unknown_imports: bool = False,
-        custom_forbidden_imports: Optional[Set[str]] = None,
-        custom_allowed_imports: Optional[Set[str]] = None,
+        custom_forbidden_imports: set[str] | None = None,
+        custom_allowed_imports: set[str] | None = None,
     ):
         self.block_on_critical = block_on_critical
         self.block_on_high = block_on_high
@@ -406,12 +490,16 @@ class CodeGuardian:
         if result.blocked:
             logger.warning(
                 "CodeGuardian BLOCKED capability '%s': %d critical, %d high, %d total violations",
-                capability_id, result.critical_count, result.high_count, len(result.violations),
+                capability_id,
+                result.critical_count,
+                result.high_count,
+                len(result.violations),
             )
         elif result.violations:
             logger.warning(
                 "CodeGuardian WARNING for capability '%s': %d violations (not blocked)",
-                capability_id, len(result.violations),
+                capability_id,
+                len(result.violations),
             )
         else:
             logger.debug("CodeGuardian: capability '%s' passed all layers", capability_id)
@@ -434,14 +522,16 @@ class CodeGuardian:
                     if predicate(node):
                         line = getattr(node, "lineno", None)
                         snippet = self._get_line(code, line)
-                        result.violations.append(SecurityViolation(
-                            layer=1,
-                            violation_type=vtype,
-                            severity=severity,
-                            description=f"Dangerous AST pattern: {name}",
-                            line_number=line,
-                            snippet=snippet,
-                        ))
+                        result.violations.append(
+                            SecurityViolation(
+                                layer=1,
+                                violation_type=vtype,
+                                severity=severity,
+                                description=f"Dangerous AST pattern: {name}",
+                                line_number=line,
+                                snippet=snippet,
+                            )
+                        )
                 except Exception:
                     pass
 
@@ -458,14 +548,16 @@ class CodeGuardian:
                 continue
             for pattern, vtype, severity in DANGEROUS_REGEX_PATTERNS:
                 if re.search(pattern, line):
-                    result.violations.append(SecurityViolation(
-                        layer=2,
-                        violation_type=vtype,
-                        severity=severity,
-                        description=f"Dangerous pattern detected: {vtype}",
-                        line_number=i,
-                        snippet=line.strip()[:120],
-                    ))
+                    result.violations.append(
+                        SecurityViolation(
+                            layer=2,
+                            violation_type=vtype,
+                            severity=severity,
+                            description=f"Dangerous pattern detected: {vtype}",
+                            line_number=i,
+                            snippet=line.strip()[:120],
+                        )
+                    )
 
     # -----------------------------------------------------------------------
     # Layer 3: Evasion Detection
@@ -478,14 +570,16 @@ class CodeGuardian:
                 continue
             for pattern, vtype, severity, description in EVASION_PATTERNS:
                 if re.search(pattern, line, re.IGNORECASE):
-                    result.violations.append(SecurityViolation(
-                        layer=3,
-                        violation_type=vtype,
-                        severity=severity,
-                        description=description,
-                        line_number=i,
-                        snippet=line.strip()[:120],
-                    ))
+                    result.violations.append(
+                        SecurityViolation(
+                            layer=3,
+                            violation_type=vtype,
+                            severity=severity,
+                            description=description,
+                            line_number=i,
+                            snippet=line.strip()[:120],
+                        )
+                    )
 
     # -----------------------------------------------------------------------
     # Layer 4: Secret Detection
@@ -504,14 +598,16 @@ class CodeGuardian:
                         if match and self._shannon_entropy(match.group()) < 3.5:
                             continue  # Low entropy — likely not a real secret
                     # Redact the actual secret value in the report
-                    result.violations.append(SecurityViolation(
-                        layer=4,
-                        violation_type=vtype,
-                        severity=severity,
-                        description=f"Potential credential detected: {vtype}",
-                        line_number=i,
-                        snippet=f"[REDACTED — {vtype} pattern on line {i}]",
-                    ))
+                    result.violations.append(
+                        SecurityViolation(
+                            layer=4,
+                            violation_type=vtype,
+                            severity=severity,
+                            description=f"Potential credential detected: {vtype}",
+                            line_number=i,
+                            snippet=f"[REDACTED — {vtype} pattern on line {i}]",
+                        )
+                    )
 
     # -----------------------------------------------------------------------
     # Layer 5: Import Allowlist
@@ -535,28 +631,32 @@ class CodeGuardian:
         root = module_name.split(".")[0]
         if root in self._forbidden:
             result.forbidden_imports.append(module_name)
-            result.violations.append(SecurityViolation(
-                layer=5,
-                violation_type="FORBIDDEN_IMPORT",
-                severity="CRITICAL",
-                description=f"Import of forbidden module: '{module_name}'",
-            ))
+            result.violations.append(
+                SecurityViolation(
+                    layer=5,
+                    violation_type="FORBIDDEN_IMPORT",
+                    severity="CRITICAL",
+                    description=f"Import of forbidden module: '{module_name}'",
+                )
+            )
         elif root not in self._allowed:
             result.unknown_imports.append(module_name)
             if self.block_unknown_imports:
-                result.violations.append(SecurityViolation(
-                    layer=5,
-                    violation_type="UNKNOWN_IMPORT",
-                    severity="MEDIUM",
-                    description=f"Import of unknown/unvetted module: '{module_name}'",
-                ))
+                result.violations.append(
+                    SecurityViolation(
+                        layer=5,
+                        violation_type="UNKNOWN_IMPORT",
+                        severity="MEDIUM",
+                        description=f"Import of unknown/unvetted module: '{module_name}'",
+                    )
+                )
 
     # -----------------------------------------------------------------------
     # Utilities
     # -----------------------------------------------------------------------
 
     @staticmethod
-    def _get_line(code: str, line_number: Optional[int]) -> Optional[str]:
+    def _get_line(code: str, line_number: int | None) -> str | None:
         if not line_number:
             return None
         lines = code.splitlines()

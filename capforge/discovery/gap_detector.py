@@ -6,11 +6,10 @@ Detects missing capabilities and formulates an actionable acquisition specificat
 
 from __future__ import annotations
 
-from typing import List
 from capforge.core.models import CapabilityGap
-from capforge.registry.store import CapabilityRegistry
+from capforge.discovery.analyzer import DecomposedTask, TaskAnalyzer
 from capforge.registry.search import CapabilityMatcher
-from capforge.discovery.analyzer import TaskAnalyzer, DecomposedTask
+from capforge.registry.store import CapabilityRegistry
 
 
 class CapabilityGapDetector:
@@ -24,9 +23,9 @@ class CapabilityGapDetector:
     def evaluate_task(self, task_intent: str) -> CapabilityGap:
         """Analyze a user task and determine if a capability gap exists."""
         decomposed: DecomposedTask = self.analyzer.analyze(task_intent)
-        
-        available_primitives: List[str] = []
-        missing_primitives: List[str] = []
+
+        available_primitives: list[str] = []
+        missing_primitives: list[str] = []
 
         for prim in decomposed.required_primitives:
             matches = self.matcher.find_matches(prim, threshold=0.60, limit=1)
@@ -44,7 +43,7 @@ class CapabilityGapDetector:
             gap_detected = len(missing_primitives) > 0
 
         # Suggested acquisition sources
-        sources: List[str] = []
+        sources: list[str] = []
         if decomposed.target_service_or_entity != "generic_service":
             clean_svc = decomposed.target_service_or_entity.lower().replace(" ", "_")
             sources.append(f"docs://{clean_svc}/api-reference.json")
@@ -70,5 +69,5 @@ class CapabilityGapDetector:
             available_primitives=available_primitives,
             confidence=0.95 if gap_detected else 0.85,
             suggested_acquisition_sources=sources,
-            rationale=rationale
+            rationale=rationale,
         )

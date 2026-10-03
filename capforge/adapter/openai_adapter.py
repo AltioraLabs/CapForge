@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from capforge.adapter.standard import StandardAgentAdapter
 from capforge.core.models import Capability, ExecutionResponse
@@ -19,10 +19,10 @@ logger = logging.getLogger("capforge.adapter.openai")
 class OpenAIAgentAdapter(StandardAgentAdapter):
     """Bridge for integrating CapForge capabilities into OpenAI Agents tool calling."""
 
-    def to_openai_tool(self, capability: Capability) -> Dict[str, Any]:
+    def to_openai_tool(self, capability: Capability) -> dict[str, Any]:
         """Convert a CapForge Capability into an OpenAI function tool definition."""
-        properties: Dict[str, Any] = {}
-        required: List[str] = []
+        properties: dict[str, Any] = {}
+        required: list[str] = []
 
         for p_name, p_spec in capability.inputs.items():
             raw_type = getattr(p_spec, "type", "string") or "string"
@@ -62,12 +62,12 @@ class OpenAIAgentAdapter(StandardAgentAdapter):
             },
         }
 
-    def get_openai_tools(self, namespace: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_openai_tools(self, namespace: str | None = None) -> list[dict[str, Any]]:
         """Return all active capabilities formatted as OpenAI tools."""
         caps = self.registry.list_capabilities(namespace=namespace)
         return [self.to_openai_tool(c) for c in caps]
 
-    def handle_tool_call(self, tool_call: Dict[str, Any]) -> Dict[str, Any]:
+    def handle_tool_call(self, tool_call: dict[str, Any]) -> dict[str, Any]:
         """Handle an OpenAI tool call dictionary and format response message."""
         call_id = tool_call.get("id", "call_unknown")
         func_info = tool_call.get("function", {})

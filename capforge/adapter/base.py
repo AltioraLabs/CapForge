@@ -8,12 +8,11 @@ plug into CapForge's capability evolution runtime.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from capforge.core.models import (
     AgentEvent,
     Capability,
-    ExecutionRequest,
     ExecutionResponse,
     ToolRequirement,
 )
@@ -23,12 +22,12 @@ class BaseAgentAdapter(ABC):
     """Abstract interface for all CapForge agent framework adapters."""
 
     @abstractmethod
-    def discover_tools(self) -> List[ToolRequirement]:
+    def discover_tools(self) -> list[ToolRequirement]:
         """Discover tools currently registered in the host agent framework."""
         ...
 
     @abstractmethod
-    def capture_events(self) -> List[AgentEvent]:
+    def capture_events(self) -> list[AgentEvent]:
         """Drain or capture runtime events produced by the host agent."""
         ...
 
@@ -38,7 +37,7 @@ class BaseAgentAdapter(ABC):
         ...
 
     @abstractmethod
-    def extract_tool_call(self, raw_call: Any) -> Dict[str, Any]:
+    def extract_tool_call(self, raw_call: Any) -> dict[str, Any]:
         """Extract tool call parameters from host agent tool execution format."""
         ...
 
@@ -48,7 +47,7 @@ class BaseAgentAdapter(ABC):
         ...
 
     @abstractmethod
-    def invoke_skill(self, capability_id: str, inputs: Dict[str, Any]) -> ExecutionResponse:
+    def invoke_skill(self, capability_id: str, inputs: dict[str, Any]) -> ExecutionResponse:
         """Invoke a CapForge capability on behalf of the host agent."""
         ...
 

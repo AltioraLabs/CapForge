@@ -7,7 +7,7 @@ for a given task requirement or primitive name.
 from __future__ import annotations
 
 import re
-from typing import List, Tuple
+
 from capforge.core.models import Capability, CapabilityStatus
 from capforge.registry.store import CapabilityRegistry
 
@@ -23,8 +23,8 @@ class CapabilityMatcher:
         query: str,
         threshold: float = 0.30,
         limit: int = 5,
-        status: Optional[CapabilityStatus] = None,
-    ) -> List[Tuple[Capability, float]]:
+        status: CapabilityStatus | None = None,
+    ) -> list[tuple[Capability, float]]:
         """Find capabilities matching the search query, returned with similarity scores [0.0 - 1.0]."""
         if status:
             all_caps = self.registry.list_capabilities(status=status)
@@ -32,7 +32,7 @@ class CapabilityMatcher:
             all_caps = self.registry.list_capabilities()
 
         query_terms = set(re.findall(r"\w+", query.lower()))
-        results: List[Tuple[Capability, float]] = []
+        results: list[tuple[Capability, float]] = []
 
         for cap in all_caps:
             score = self._compute_similarity(query_terms, query.lower(), cap)
@@ -47,6 +47,7 @@ class CapabilityMatcher:
 
     def match(self, query: str, top_k: int = 5, threshold: float = 0.1) -> list:
         """Find matching capabilities and return list of objects with .capability attribute."""
+
         class MatchResult:
             def __init__(self, capability: Capability, score: float):
                 self.capability = capability
@@ -86,9 +87,9 @@ class CapabilityMatcher:
 
         # Character n-gram fuzzy similarity (sub-token and typo resilience)
         if len(query_raw) >= 3:
-            ngrams_q = set(query_raw[i:i+3] for i in range(len(query_raw) - 2))
+            ngrams_q = set(query_raw[i : i + 3] for i in range(len(query_raw) - 2))
             corpus_text = f"{cap.id} {cap.name} {cap.description} {' '.join(cap.tags)}".lower()
-            ngrams_c = set(corpus_text[i:i+3] for i in range(len(corpus_text) - 2))
+            ngrams_c = set(corpus_text[i : i + 3] for i in range(len(corpus_text) - 2))
             if ngrams_q and ngrams_c:
                 coverage = len(ngrams_q & ngrams_c) / len(ngrams_q)
                 score += coverage * 0.35

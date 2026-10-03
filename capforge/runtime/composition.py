@@ -6,9 +6,9 @@ into compound workflows without rediscovering solved sub-problems from scratch.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
-from capforge.core.models import Capability, ParameterSpec, CapabilityStatus
+from pydantic import BaseModel
+
+from capforge.core.models import Capability, CapabilityStatus
 from capforge.registry.store import CapabilityRegistry
 
 
@@ -16,31 +16,31 @@ class PrimitiveDefinition(BaseModel):
     id: str
     name: str
     code_snippet: str
-    inputs: List[str]
-    outputs: List[str]
+    inputs: list[str]
+    outputs: list[str]
 
 
 class CompositionEngine:
     """Manages the composition of reusable primitive capabilities into higher-order workflows."""
 
-    STANDARD_PRIMITIVES: Dict[str, PrimitiveDefinition] = {
+    STANDARD_PRIMITIVES: dict[str, PrimitiveDefinition] = {
         "auth_bearer": PrimitiveDefinition(
             id="auth_bearer",
             name="Bearer Token Auth Handler",
-            code_snippet='''
+            code_snippet="""
 def apply_bearer_auth(headers: dict, token: str) -> dict:
     updated = dict(headers or {})
     if token:
         updated["Authorization"] = f"Bearer {token}"
     return updated
-'''.strip(),
+""".strip(),
             inputs=["headers", "token"],
-            outputs=["headers"]
+            outputs=["headers"],
         ),
         "cursor_pagination": PrimitiveDefinition(
             id="cursor_pagination",
             name="Cursor-based Paginator",
-            code_snippet='''
+            code_snippet="""
 def paginate_items(fetch_fn, initial_params: dict, max_pages: int = 5) -> list:
     all_items = []
     params = dict(initial_params or {})
@@ -53,14 +53,14 @@ def paginate_items(fetch_fn, initial_params: dict, max_pages: int = 5) -> list:
             break
         params["cursor"] = cursor
     return all_items
-'''.strip(),
+""".strip(),
             inputs=["fetch_fn", "initial_params"],
-            outputs=["items"]
+            outputs=["items"],
         ),
         "rate_limit_backoff": PrimitiveDefinition(
             id="rate_limit_backoff",
             name="Rate Limit Retry with Exponential Backoff",
-            code_snippet='''
+            code_snippet="""
 import time
 
 def retry_with_backoff(call_fn, max_retries: int = 3, initial_delay: float = 1.0):
@@ -72,14 +72,14 @@ def retry_with_backoff(call_fn, max_retries: int = 3, initial_delay: float = 1.0
         time.sleep(delay)
         delay *= 2
     return result
-'''.strip(),
+""".strip(),
             inputs=["call_fn"],
-            outputs=["result"]
+            outputs=["result"],
         ),
         "anomaly_detector": PrimitiveDefinition(
             id="anomaly_detector",
             name="Statistical Metric Anomaly Detector",
-            code_snippet='''
+            code_snippet="""
 def detect_anomalies(data_points: list, threshold_std: float = 2.0) -> list:
     if len(data_points) < 3:
         return []
@@ -92,26 +92,21 @@ def detect_anomalies(data_points: list, threshold_std: float = 2.0) -> list:
         if std > 0 and abs(val - mean) / std >= threshold_std:
             anomalies.append({"index": i, "value": val, "z_score": round((val - mean) / std, 2)})
     return anomalies
-'''.strip(),
+""".strip(),
             inputs=["data_points"],
-            outputs=["anomalies"]
-        )
+            outputs=["anomalies"],
+        ),
     }
 
-    def __init__(self, registry: Optional[CapabilityRegistry] = None):
+    def __init__(self, registry: CapabilityRegistry | None = None):
         self.registry = registry
 
-    def get_primitive(self, primitive_id: str) -> Optional[PrimitiveDefinition]:
+    def get_primitive(self, primitive_id: str) -> PrimitiveDefinition | None:
         """Fetch primitive definition by identifier."""
         return self.STANDARD_PRIMITIVES.get(primitive_id)
 
     def synthesize_composite_capability(
-        self,
-        composite_id: str,
-        name: str,
-        description: str,
-        primitive_ids: List[str],
-        custom_logic: str
+        self, composite_id: str, name: str, description: str, primitive_ids: list[str], custom_logic: str
     ) -> Capability:
         """Compose multiple primitives into a unified new Capability object."""
         snippets = []
@@ -132,5 +127,5 @@ def detect_anomalies(data_points: list, threshold_std: float = 2.0) -> list:
             tags=["composed", *primitive_ids],
             code_body=combined_code,
             entrypoint_function="execute",
-            changelog=f"Synthesized from primitives: {', '.join(primitive_ids)}"
+            changelog=f"Synthesized from primitives: {', '.join(primitive_ids)}",
         )

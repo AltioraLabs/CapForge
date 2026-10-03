@@ -47,3 +47,28 @@ testpaths = [
     "tests"
 ]
 asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",   # line length
+    "B008",   # function call in argument defaults (FastAPI Depends/Query/Body)
+    "UP042",  # Class inherits from both str and enum.Enum (keep compatible)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["capforge"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401", "RUF022"]
+"capforge/verification/sandbox.py" = ["S102"]

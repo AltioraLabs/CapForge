@@ -6,14 +6,15 @@ and auditable asynchronous or background jobs.
 
 from __future__ import annotations
 
-import uuid
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+import uuid
+from datetime import UTC, datetime
+from typing import Any
+
 from pydantic import BaseModel, Field
 
-from capforge.core.models import AgentEvent, Capability, EventType
-from capforge.runtime.agent_adapter import CapForgeAgent, AgentLifecycleTrace
+from capforge.core.models import AgentEvent, EventType
+from capforge.runtime.agent_adapter import CapForgeAgent
 
 logger = logging.getLogger("capforge.learning_jobs")
 
@@ -21,31 +22,31 @@ logger = logging.getLogger("capforge.learning_jobs")
 class LearningJob(BaseModel):
     job_id: str = Field(default_factory=lambda: f"job_{uuid.uuid4().hex[:8]}")
     task_intent: str
-    knowledge_spec: Optional[Dict[str, Any]] = None
-    task_inputs: Dict[str, Any] = Field(default_factory=dict)
+    knowledge_spec: dict[str, Any] | None = None
+    task_inputs: dict[str, Any] = Field(default_factory=dict)
     status: str = "QUEUED"  # QUEUED, RUNNING, COMPLETED, FAILED
     step: str = "initialized"  # gap_detection, synthesis, verification, risk_gate, promotion, completed
     progress_pct: int = 0
-    capability_id: Optional[str] = None
-    version: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    trace: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    capability_id: str | None = None
+    version: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    trace: dict[str, Any] | None = None
+    error: str | None = None
 
 
 class LearningJobManager:
     """In-memory or persistent registry of background learning jobs."""
 
-    def __init__(self, agent: Optional[CapForgeAgent] = None):
+    def __init__(self, agent: CapForgeAgent | None = None):
         self.agent = agent or CapForgeAgent()
-        self._jobs: Dict[str, LearningJob] = {}
+        self._jobs: dict[str, LearningJob] = {}
 
     def create_job(
         self,
         task_intent: str,
-        task_inputs: Optional[Dict[str, Any]] = None,
-        knowledge_spec: Optional[Dict[str, Any]] = None,
+        task_inputs: dict[str, Any] | None = None,
+        knowledge_spec: dict[str, Any] | None = None,
     ) -> LearningJob:
         """Create and queue a new capability learning job."""
         job = LearningJob(
@@ -66,16 +67,18 @@ class LearningJobManager:
         job.status = "RUNNING"
         job.step = "gap_detection"
         job.progress_pct = 20
-        job.updated_at = datetime.now(timezone.utc)
+        job.updated_at = datetime.now(UTC)
 
         try:
             # Emit job start event
-            self.agent.event_gateway.emit(AgentEvent(
-                event_type=EventType.TASK_STARTED,
-                agent_id="learning_runtime",
-                run_id=job.job_id,
-                input_data={"task_intent": job.task_intent},
-            ))
+            self.agent.event_gateway.emit(
+                AgentEvent(
+                    event_type=EventType.TASK_STARTED,
+                    agent_id="learning_runtime",
+                    run_id=job.job_id,
+                    input_data={"task_intent": job.task_intent},
+                )
+            )
 
             job.step = "synthesis_and_verification"
             job.progress_pct = 50
@@ -116,13 +119,13 @@ class LearningJobManager:
             job.error = str(e)
             job.progress_pct = 100
 
-        job.updated_at = datetime.now(timezone.utc)
+        job.updated_at = datetime.now(UTC)
         return job
 
-    def get_job(self, job_id: str) -> Optional[LearningJob]:
+    def get_job(self, job_id: str) -> LearningJob | None:
         return self._jobs.get(job_id)
 
-    def list_jobs(self, status: Optional[str] = None) -> List[LearningJob]:
+    def list_jobs(self, status: str | None = None) -> list[LearningJob]:
         jobs = list(self._jobs.values())
         if status:
             jobs = [j for j in jobs if j.status.upper() == status.upper()]

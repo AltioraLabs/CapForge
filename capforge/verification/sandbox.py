@@ -18,8 +18,7 @@ import tempfile
 import textwrap
 import time
 import traceback
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from capforge.core.exceptions import SandboxExecutionError
 
@@ -34,7 +33,7 @@ class SandboxRunner:
     def __init__(
         self,
         default_timeout_sec: float = 15.0,
-        python_executable: Optional[str] = None,
+        python_executable: str | None = None,
         use_subprocess: bool = True,
     ) -> None:
         self.default_timeout_sec = default_timeout_sec
@@ -42,12 +41,24 @@ class SandboxRunner:
         self.use_subprocess = use_subprocess
 
     @staticmethod
-    def _build_sanitized_env() -> Dict[str, str]:
+    def _build_sanitized_env() -> dict[str, str]:
         """Filter out sensitive credentials and tokens from sandbox subprocess environment."""
         sensitive_patterns = ("KEY", "SECRET", "TOKEN", "PASSWORD", "CREDENTIAL", "AUTH", "PRIVATE")
         safe_keys = {
-            "PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PYTHONPATH", "PYTHONHOME",
-            "LANG", "LC_ALL", "USERPROFILE", "HOMEPATH", "HOMEDRIVE", "COMSPEC", "PATHEXT",
+            "PATH",
+            "SYSTEMROOT",
+            "WINDIR",
+            "TEMP",
+            "TMP",
+            "PYTHONPATH",
+            "PYTHONHOME",
+            "LANG",
+            "LC_ALL",
+            "USERPROFILE",
+            "HOMEPATH",
+            "HOMEDRIVE",
+            "COMSPEC",
+            "PATHEXT",
         }
         clean_env = {"PYTHONDONTWRITEBYTECODE": "1"}
         for k, v in os.environ.items():
@@ -62,10 +73,10 @@ class SandboxRunner:
         self,
         code_body: str,
         entrypoint: str,
-        inputs: Dict[str, Any],
-        timeout_sec: Optional[float] = None,
-        env_overrides: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        inputs: dict[str, Any],
+        timeout_sec: float | None = None,
+        env_overrides: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """Execute code in an isolated context and return output and execution time.
 
         Args:
@@ -81,10 +92,10 @@ class SandboxRunner:
         self,
         code_body: str,
         entrypoint: str,
-        inputs: Dict[str, Any],
-        timeout_sec: Optional[float] = None,
-        env_overrides: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        inputs: dict[str, Any],
+        timeout_sec: float | None = None,
+        env_overrides: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """Execute code in a subprocess for isolation."""
         timeout = timeout_sec or self.default_timeout_sec
         start_time = time.perf_counter()
@@ -215,18 +226,17 @@ class SandboxRunner:
         self,
         code_body: str,
         entrypoint: str,
-        inputs: Dict[str, Any],
-        timeout_sec: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        inputs: dict[str, Any],
+        timeout_sec: float | None = None,
+    ) -> dict[str, Any]:
         """Execute code in an isolated dictionary namespace (development/test mode).
 
         WARNING: This does NOT provide security isolation. Use subprocess mode
         for any untrusted code.
         """
-        timeout = timeout_sec or self.default_timeout_sec
         start_time = time.perf_counter()
 
-        scope: Dict[str, Any] = {
+        scope: dict[str, Any] = {
             "__builtins__": __builtins__,
             "inputs": inputs,
         }

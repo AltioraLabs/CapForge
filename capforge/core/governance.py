@@ -7,17 +7,16 @@ runtime capability permission enforcement (discussion.mdx §27).
 from __future__ import annotations
 
 import ast
-import uuid
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+import uuid
+from datetime import UTC, datetime
+
 from pydantic import BaseModel, Field
 
 from capforge.core.models import (
     Capability,
     ExecutionRequest,
     RiskLevel,
-    ToolPermissions,
 )
 
 logger = logging.getLogger("capforge.governance")
@@ -27,32 +26,36 @@ logger = logging.getLogger("capforge.governance")
 # Human Review Ticket Model
 # ---------------------------------------------------------------------------
 
+
 class HumanReviewTicket(BaseModel):
     """Auditable review ticket for high-risk or escalated capabilities."""
+
     ticket_id: str = Field(default_factory=lambda: f"ticket_{uuid.uuid4().hex[:8]}")
     capability_id: str
     version: str
     risk_level: RiskLevel
     escalation_reason: str
-    code_snippet: Optional[str] = None
+    code_snippet: str | None = None
     status: str = "PENDING"  # PENDING, APPROVED, REJECTED
-    reviewed_by: Optional[str] = None
-    review_notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    resolved_at: Optional[datetime] = None
+    reviewed_by: str | None = None
+    review_notes: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    resolved_at: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
 # Risk Engine
 # ---------------------------------------------------------------------------
 
+
 class RiskAssessment(BaseModel):
     """Result of a risk assessment on a capability."""
+
     capability_id: str
     version: str
     risk_level: RiskLevel
     risk_score: float  # 0.0 - 1.0
-    factors: List[str] = Field(default_factory=list)
+    factors: list[str] = Field(default_factory=list)
     requires_human_approval: bool = False
     auto_promote_allowed: bool = True
 
@@ -67,7 +70,7 @@ class RiskEngine:
     """
 
     # Weights for permission dimensions
-    PERMISSION_WEIGHTS: Dict[str, Dict[str, float]] = {
+    PERMISSION_WEIGHTS: dict[str, dict[str, float]] = {
         "filesystem": {"none": 0.0, "read": 0.1, "write": 0.4},
         "network": {"none": 0.0, "restricted": 0.15, "full": 0.35},
         "github": {"none": 0.0, "read": 0.05, "write": 0.3},
@@ -79,17 +82,17 @@ class RiskEngine:
     LOW_THRESHOLD = 0.25
     HIGH_THRESHOLD = 0.55
 
-    def __init__(self, review_tickets: Optional[List[HumanReviewTicket]] = None):
-        self.review_tickets: List[HumanReviewTicket] = review_tickets if review_tickets is not None else []
+    def __init__(self, review_tickets: list[HumanReviewTicket] | None = None):
+        self.review_tickets: list[HumanReviewTicket] = review_tickets if review_tickets is not None else []
 
-    def get_ticket(self, ticket_id: str) -> Optional[HumanReviewTicket]:
+    def get_ticket(self, ticket_id: str) -> HumanReviewTicket | None:
         """Find a review ticket by ID."""
         for t in self.review_tickets:
             if t.ticket_id == ticket_id:
                 return t
         return None
 
-    def list_tickets(self, status: Optional[str] = None) -> List[HumanReviewTicket]:
+    def list_tickets(self, status: str | None = None) -> list[HumanReviewTicket]:
         """List review tickets with optional status filtering."""
         if status:
             return [t for t in self.review_tickets if t.status.upper() == status.upper()]
@@ -108,7 +111,7 @@ class RiskEngine:
         ticket.status = "APPROVED"
         ticket.reviewed_by = reviewer
         ticket.review_notes = notes
-        ticket.resolved_at = datetime.now(timezone.utc)
+        ticket.resolved_at = datetime.now(UTC)
         logger.info(f"Approved review ticket {ticket_id} for {ticket.capability_id} by {reviewer}")
         return ticket
 
@@ -125,14 +128,14 @@ class RiskEngine:
         ticket.status = "REJECTED"
         ticket.reviewed_by = reviewer
         ticket.review_notes = notes
-        ticket.resolved_at = datetime.now(timezone.utc)
+        ticket.resolved_at = datetime.now(UTC)
         logger.warning(f"Rejected review ticket {ticket_id} for {ticket.capability_id} by {reviewer}")
         return ticket
 
     def assess(self, capability: Capability) -> RiskAssessment:
         """Perform a risk assessment on a capability."""
         score = 0.0
-        factors: List[str] = []
+        factors: list[str] = []
 
         # 1. Permission-based risk
         perms = capability.permissions
@@ -182,7 +185,11 @@ class RiskEngine:
                             factors.append("AST anomaly: filesystem open() called with filesystem='none'")
 
                     elif isinstance(node, (ast.Import, ast.ImportFrom)):
-                        names = [alias.name for alias in node.names] if isinstance(node, ast.Import) else [node.module or ""]
+                        names = (
+                            [alias.name for alias in node.names]
+                            if isinstance(node, ast.Import)
+                            else [node.module or ""]
+                        )
                         for mod in names:
                             if mod in ("subprocess", "pty", "commands"):
                                 ast_violation = True
@@ -192,7 +199,9 @@ class RiskEngine:
                                 factors.append(f"AST anomaly: unauthorized network module '{mod}' with network='none'")
                             elif mod in ("shutil",) and perms.filesystem == "none":
                                 ast_violation = True
-                                factors.append(f"AST anomaly: unauthorized filesystem module '{mod}' with filesystem='none'")
+                                factors.append(
+                                    f"AST anomaly: unauthorized filesystem module '{mod}' with filesystem='none'"
+                                )
             except Exception as e:
                 ast_violation = True
                 factors.append(f"AST parse error: {e}")
@@ -237,12 +246,14 @@ class RiskEngine:
 # Capability Firewall
 # ---------------------------------------------------------------------------
 
+
 class FirewallDecision(BaseModel):
     """Result of a firewall check on a capability execution request."""
+
     allowed: bool
     capability_id: str
     version: str
-    blocked_reason: Optional[str] = None
+    blocked_reason: str | None = None
     risk_level: RiskLevel = RiskLevel.LOW
 
 
@@ -259,8 +270,8 @@ class CapabilityFirewall:
 
     def __init__(
         self,
-        risk_engine: Optional[RiskEngine] = None,
-        blocked_capabilities: Optional[set[str]] = None,
+        risk_engine: RiskEngine | None = None,
+        blocked_capabilities: set[str] | None = None,
         max_risk_level: RiskLevel = RiskLevel.HIGH,
     ) -> None:
         self.risk_engine = risk_engine or RiskEngine()
@@ -286,6 +297,7 @@ class CapabilityFirewall:
 
         # 2. Status check — only ACTIVE or EXPERIMENTAL allowed
         from capforge.core.models import CapabilityStatus
+
         if capability.status in (CapabilityStatus.QUARANTINED, CapabilityStatus.DEPRECATED):
             return FirewallDecision(
                 allowed=False,

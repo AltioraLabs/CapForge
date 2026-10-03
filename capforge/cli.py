@@ -9,18 +9,17 @@ from __future__ import annotations
 
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 from rich.tree import Tree
 
 from capforge.core.config import setup_logging
-from capforge.core.models import CapabilityStatus, RiskLevel
 from capforge.core.governance import RiskEngine
-from capforge.registry.store import CapabilityRegistry
-from capforge.discovery.gap_detector import CapabilityGapDetector
+from capforge.core.models import CapabilityStatus, RiskLevel
 from capforge.discovery.capability_graph import CapabilityGraph
+from capforge.discovery.gap_detector import CapabilityGapDetector
+from capforge.registry.store import CapabilityRegistry
 from capforge.verification.evaluator import CapabilityEvaluator
-from capforge.versioning.manager import VersionManager
 
 app = typer.Typer(
     name="capforge",
@@ -78,23 +77,27 @@ def analyze_task(task_prompt: str = typer.Argument(..., help="The natural langua
         gap = detector.evaluate_task(task_prompt)
 
     if gap.gap_detected:
-        console.print(Panel(
-            f"[bold red]CAPABILITY GAP DETECTED[/bold red]\n\n"
-            f"[bold]Task:[/bold] {task_prompt}\n"
-            f"[bold]Missing Primitives:[/bold] {gap.missing_primitives}\n"
-            f"[bold]Available Primitives:[/bold] {gap.available_primitives}\n"
-            f"[bold]Suggested Sources:[/bold] {gap.suggested_acquisition_sources}\n\n"
-            f"[italic]{gap.rationale}[/italic]",
-            title="CapForge Gap Detector",
-            border_style="red",
-        ))
+        console.print(
+            Panel(
+                f"[bold red]CAPABILITY GAP DETECTED[/bold red]\n\n"
+                f"[bold]Task:[/bold] {task_prompt}\n"
+                f"[bold]Missing Primitives:[/bold] {gap.missing_primitives}\n"
+                f"[bold]Available Primitives:[/bold] {gap.available_primitives}\n"
+                f"[bold]Suggested Sources:[/bold] {gap.suggested_acquisition_sources}\n\n"
+                f"[italic]{gap.rationale}[/italic]",
+                title="CapForge Gap Detector",
+                border_style="red",
+            )
+        )
     else:
-        console.print(Panel(
-            f"[bold green]CAPABILITY AVAILABLE[/bold green]\n\n"
-            f"All required primitives exist in the registry. Direct execution authorized.",
-            title="CapForge Gap Detector",
-            border_style="green",
-        ))
+        console.print(
+            Panel(
+                "[bold green]CAPABILITY AVAILABLE[/bold green]\n\n"
+                "All required primitives exist in the registry. Direct execution authorized.",
+                title="CapForge Gap Detector",
+                border_style="green",
+            )
+        )
 
 
 @app.command("test")
@@ -143,15 +146,19 @@ def assess_risk(capability_id: str = typer.Argument(..., help="ID of capability 
     risk_colors = {"LOW": "green", "MEDIUM": "yellow", "HIGH": "red"}
     color = risk_colors.get(assessment.risk_level.value, "white")
 
-    console.print(Panel(
-        f"[bold {color}]RISK: {assessment.risk_level.value}[/bold {color}]  "
-        f"(score: {assessment.risk_score:.3f})\n\n"
-        f"[bold]Auto-Promote:[/bold] {'✅' if assessment.auto_promote_allowed else '❌'}\n"
-        f"[bold]Human Approval:[/bold] {'⚠️ Required' if assessment.requires_human_approval else '✅ Not required'}\n\n"
-        f"[bold]Risk Factors:[/bold]\n" + "\n".join(f"  • {f}" for f in assessment.factors) if assessment.factors else "  (none)",
-        title=f"Risk Assessment: {cap.id} v{cap.version}",
-        border_style=color,
-    ))
+    console.print(
+        Panel(
+            f"[bold {color}]RISK: {assessment.risk_level.value}[/bold {color}]  "
+            f"(score: {assessment.risk_score:.3f})\n\n"
+            f"[bold]Auto-Promote:[/bold] {'✅' if assessment.auto_promote_allowed else '❌'}\n"
+            f"[bold]Human Approval:[/bold] {'⚠️ Required' if assessment.requires_human_approval else '✅ Not required'}\n\n"
+            f"[bold]Risk Factors:[/bold]\n" + "\n".join(f"  • {f}" for f in assessment.factors)
+            if assessment.factors
+            else "  (none)",
+            title=f"Risk Assessment: {cap.id} v{cap.version}",
+            border_style=color,
+        )
+    )
 
 
 @app.command("graph")
@@ -186,6 +193,7 @@ def show_graph(capability_id: str = typer.Argument(..., help="ID of capability t
 def demo_command():
     """Run the CapForge Software Engineering Agent Killer Demonstration (discussion.mdx §39)."""
     from examples.killer_demo import run_killer_demo
+
     run_killer_demo()
 
 
@@ -196,6 +204,7 @@ def export_manifest(
 ):
     """Export a capability as a canonical YAML manifest (discussion.mdx §12)."""
     from capforge.core.manifest import capability_to_yaml
+
     registry = CapabilityRegistry()
     cap = registry.get(capability_id)
     if not cap:
@@ -217,13 +226,16 @@ def import_manifest(
 ):
     """Import a capability definition from a YAML manifest into the registry."""
     from capforge.core.manifest import manifest_yaml_to_capability
+
     try:
-        with open(manifest_path, "r", encoding="utf-8") as f:
+        with open(manifest_path, encoding="utf-8") as f:
             content = f.read()
         cap = manifest_yaml_to_capability(content)
         registry = CapabilityRegistry()
         registered = registry.register(cap)
-        console.print(f"[green]Successfully imported capability '{registered.id}' (v{registered.version}) into registry.[/green]")
+        console.print(
+            f"[green]Successfully imported capability '{registered.id}' (v{registered.version}) into registry.[/green]"
+        )
     except Exception as e:
         console.print(f"[red]Failed to import manifest: {e}[/red]")
         raise typer.Exit(1)
@@ -233,6 +245,7 @@ def import_manifest(
 def list_jobs():
     """List recent autonomous learning jobs."""
     from capforge.acquisition.jobs import LearningJobManager
+
     mgr = LearningJobManager()
     jobs = mgr.list_jobs()
     if not jobs:
@@ -267,20 +280,27 @@ def start_server(
 ):
     """Launch the CapForge FastAPI REST server and Control Center Dashboard."""
     import uvicorn
+
     setup_logging()
     console.print(f"[bold green]Starting CapForge API server at http://{host}:{port}...[/bold green]")
-    console.print(f"[bold cyan]CapForge Control Center Dashboard available at http://{host}:{port}/dashboard[/bold cyan]")
+    console.print(
+        f"[bold cyan]CapForge Control Center Dashboard available at http://{host}:{port}/dashboard[/bold cyan]"
+    )
     uvicorn.run("capforge.server.app:app", host=host, port=port, reload=False)
 
 
 @app.command("version")
 def show_version():
     """Print the active CapForge version and platform information."""
-    import sys
     import platform
+    import sys
+
     import capforge
+
     console.print(f"[bold cyan]CapForge Engine:[/bold cyan] [green]v{capforge.__version__}[/green]")
-    console.print(f"[cyan]Python Runtime:[/cyan] {sys.version.split()[0]} on {platform.system()} ({platform.machine()})")
+    console.print(
+        f"[cyan]Python Runtime:[/cyan] {sys.version.split()[0]} on {platform.system()} ({platform.machine()})"
+    )
     console.print("[dim]Enterprise Capability Acquisition, Verification, and Evolution Platform[/dim]")
 
 
@@ -289,10 +309,11 @@ def show_version():
 def run_health_check():
     """Run production readiness diagnostics on storage, sandbox, broker, and governance."""
     import sqlite3
+
+    from capforge.core.governance import RiskEngine
+    from capforge.events.broker import InMemoryStreamBroker
     from capforge.verification.sandbox import SandboxRunner
     from capforge.verification.sandbox_docker import DockerSandboxRunner
-    from capforge.events.broker import InMemoryStreamBroker
-    from capforge.core.governance import RiskEngine
 
     console.print(Panel.fit("[bold green]CapForge Enterprise Diagnostics & Health Suite[/bold green]"))
 
@@ -303,7 +324,6 @@ def run_health_check():
 
     # 1. Database & WAL mode
     reg = CapabilityRegistry()
-    db_ok = False
     wal_status = "UNKNOWN"
     try:
         with sqlite3.connect(reg.db_path) as conn:
@@ -312,7 +332,6 @@ def run_health_check():
             row = cursor.fetchone()
             if row:
                 wal_status = row[0].upper()
-                db_ok = True
         table.add_row("SQLite Storage", "[green]PASS[/green]", f"Path: {reg.db_path.name}, Journal Mode: {wal_status}")
     except Exception as e:
         table.add_row("SQLite Storage", "[red]FAIL[/red]", str(e))
@@ -322,7 +341,11 @@ def run_health_check():
         runner = SandboxRunner()
         res = runner.execute_code("def execute(inputs): return {'ok': True}", "execute", {})
         if res.get("success"):
-            table.add_row("Subprocess Sandbox", "[green]PASS[/green]", f"Execution verified in {res.get('execution_time_ms', 0)}ms")
+            table.add_row(
+                "Subprocess Sandbox",
+                "[green]PASS[/green]",
+                f"Execution verified in {res.get('execution_time_ms', 0)}ms",
+            )
         else:
             table.add_row("Subprocess Sandbox", "[red]FAIL[/red]", str(res.get("error")))
     except Exception as e:
@@ -333,11 +356,13 @@ def run_health_check():
     if docker_runner.is_docker_enabled():
         table.add_row("Docker Sandbox", "[green]PASS[/green]", "Docker daemon active & container isolation ready")
     else:
-        table.add_row("Docker Sandbox", "[yellow]INFO[/yellow]", "Docker daemon inactive; fallback to subprocess sandbox")
+        table.add_row(
+            "Docker Sandbox", "[yellow]INFO[/yellow]", "Docker daemon inactive; fallback to subprocess sandbox"
+        )
 
     # 4. Stream Broker
     try:
-        broker = InMemoryStreamBroker()
+        InMemoryStreamBroker()
         table.add_row("Stream Broker", "[green]PASS[/green]", "In-memory ring buffer operational")
     except Exception as e:
         table.add_row("Stream Broker", "[red]FAIL[/red]", str(e))
@@ -355,4 +380,3 @@ def run_health_check():
 
 if __name__ == "__main__":
     app()
-
