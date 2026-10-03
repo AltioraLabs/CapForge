@@ -57,6 +57,9 @@ class SandboxDriver(Protocol):
 class InProcessSandboxDriver:
     """Fast in-process exec runner for development and internal testing."""
 
+    def __init__(self, **kwargs: Any) -> None:
+        pass
+
     def execute_code(
         self,
         code_body: str,
@@ -126,7 +129,7 @@ _HAS_POSIX_RLIMITS = _posix_rlimits_supported()
 class ProcessSandboxDriver:
     """Subprocess-based isolation runner with sanitized environment and timeout."""
 
-    def __init__(self, python_executable: str | None = None):
+    def __init__(self, python_executable: str | None = None, **kwargs: Any) -> None:
         self.python_executable = python_executable or sys.executable
 
     @staticmethod
@@ -289,6 +292,7 @@ class DockerSandboxDriver:
             entrypoint,
             inputs,
             timeout_sec=timeout_sec or 15.0,
+            env_overrides=env_overrides,
         )
 
 
@@ -339,7 +343,7 @@ def get_sandbox_driver(name: str = "auto", **kwargs: Any) -> SandboxDriver:
     elif normalized in ("wasm", "pyodide"):
         return WasmSandboxDriver(**kwargs)
     elif normalized in ("in_process", "inprocess", "direct"):
-        return InProcessSandboxDriver()
+        return InProcessSandboxDriver(**kwargs)
     else:
         logger.warning("Unknown sandbox driver '%s', falling back to subprocess", name)
         return ProcessSandboxDriver(**kwargs)
