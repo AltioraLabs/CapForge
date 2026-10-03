@@ -155,9 +155,59 @@ pip install -r requirements.txt
 pip install -e ".[dev]"
 ```
 
-> **Quickstart Example**: See [`examples/integration_quickstart.py`](examples/integration_quickstart.py) for runnable code demonstrating all 4 developer integration paths in under 60 lines.
+> **Quickstart Examples**:
+> - [`examples/sdk_quickstart.py`](examples/sdk_quickstart.py) - High-level Python SDK, `@capability` decorator, batch execution, and webhooks.
+> - [`examples/integration_quickstart.py`](examples/integration_quickstart.py) - Low-level framework adapters (LangGraph, CrewAI, OpenAI).
 
-### 3. Run Production Health Diagnostics
+### 3. Scaffold a New Project
+
+Use the built-in CLI to initialize a new CapForge project with sample capabilities, configuration, and tests:
+
+```bash
+# Scaffold a new project structure
+capforge init my_agent_project
+cd my_agent_project
+```
+
+### 4. High-Level Python SDK (`@capability` & `CapForgeClient`)
+
+CapForge provides a batteries-included Python SDK designed for developer ergonomic excellence:
+
+```python
+from capforge import CapForgeClient, capability
+
+# 1. Decorate any Python function with verification tests and risk gates
+@capability(
+    id="sentiment_analyzer",
+    domain="nlp",
+    risk_level="LOW",
+    tests=[{
+        "id": "test_basic",
+        "inputs": {"text": "I love CapForge!"},
+        "expected_keys": ["sentiment"],
+        "assert_expression": "output['sentiment'] == 'positive'",
+    }],
+)
+def analyze_sentiment(text: str = "") -> dict:
+    return {"sentiment": "positive" if "love" in text.lower() else "neutral"}
+
+# 2. Register, evaluate, and execute via unified CapForgeClient
+with CapForgeClient(enable_security_scan=True, auto_evaluate=True) as client:
+    # Security scan + sandbox evaluation + promotion
+    cap = client.register(analyze_sentiment, promote=True)
+
+    # Isolated sandbox execution
+    result = client.execute("sentiment_analyzer", {"text": "I love this agent framework!"})
+    print(result.output)  # {'sentiment': 'positive'}
+
+    # Export capability as standard tool schema for OpenAI / Anthropic
+    openai_tool = client.as_tool("sentiment_analyzer")
+
+    # Subscribe to event webhooks
+    client.subscribe_webhook("https://my-domain.com/webhooks/capforge", events=["skill_promoted"])
+```
+
+### 5. Run Production Health Diagnostics
 
 ```bash
 # Verify system integrity, WAL database concurrency, and sandbox execution

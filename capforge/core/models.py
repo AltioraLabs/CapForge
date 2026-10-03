@@ -240,6 +240,45 @@ class Capability(BaseModel):
     parent_version: str | None = None
     changelog: str = "Initial release"
 
+    def to_openai_tool(self) -> dict:
+        """Export capability as an OpenAI / standard function-calling tool definition."""
+        properties = {}
+        required = []
+        for name, p in self.inputs.items():
+            prop = {
+                "type": p.type,
+                "description": p.description or f"Parameter {name}",
+            }
+            if p.default is not None:
+                prop["default"] = p.default
+            properties[name] = prop
+            if p.required:
+                required.append(name)
+
+        return {
+            "type": "function",
+            "function": {
+                "name": self.id,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                },
+            },
+        }
+
+    def to_tool(self) -> dict:
+        """Alias for to_openai_tool()."""
+        return self.to_openai_tool()
+
+    @classmethod
+    def from_function(cls, func, **kwargs):
+        """Create a Capability from a Python function using the CapForge SDK."""
+        from capforge.sdk import capability_from_function
+
+        return capability_from_function(func, **kwargs)
+
 
 # ---------------------------------------------------------------------------
 # Gap Detection

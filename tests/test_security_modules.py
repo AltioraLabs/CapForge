@@ -30,6 +30,7 @@ from capforge.verification.sandbox import SandboxRunner
 # Shared fixtures
 # ---------------------------------------------------------------------------
 
+
 def _make_cap(cap_id: str, code: str, entrypoint: str = "execute") -> Capability:
     return Capability(
         id=cap_id,
@@ -58,8 +59,8 @@ def execute(inputs: dict) -> dict:
 # PROBLEM 1: CodeGuardian — LLM Synthesis Attack Surface
 # ===========================================================================
 
-class TestCodeGuardian:
 
+class TestCodeGuardian:
     def setup_method(self):
         self.guardian = CodeGuardian(block_on_critical=True, block_on_high=False)
         self.strict_guardian = CodeGuardian(block_on_critical=True, block_on_high=True)
@@ -299,8 +300,8 @@ def execute(inputs: Dict[str, Any]) -> Dict[str, Any]:
 # PROBLEM 2: AdversarialTester — Production Parity / Evasion Detection
 # ===========================================================================
 
-class TestAdversarialTester:
 
+class TestAdversarialTester:
     def setup_method(self):
         # Use subprocess sandbox for environment blindness tests to work correctly
         # (in-process sandbox shares the same process environment, so env_overrides are ignored)
@@ -327,9 +328,7 @@ class TestAdversarialTester:
 
     def test_deterministic_code_passes(self):
         cap = self._cap("det_pass", DETERMINISTIC_CODE)
-        result = self.fast_tester._test_determinism(
-            cap.code_body, cap.entrypoint_function, {"x": 5}
-        )
+        result = self.fast_tester._test_determinism(cap.code_body, cap.entrypoint_function, {"x": 5})
         assert result.deterministic
         assert result.passed
         assert len(result.differing_run_indices) == 0
@@ -342,9 +341,7 @@ def execute(inputs: dict) -> dict:
     return {"status": "SUCCESS", "value": random.randint(1, 1000000)}
 """
         cap = self._cap("det_fail_random", code)
-        result = self.fast_tester._test_determinism(
-            cap.code_body, cap.entrypoint_function, {}
-        )
+        result = self.fast_tester._test_determinism(cap.code_body, cap.entrypoint_function, {})
         assert result.runs == 3
         assert isinstance(result.outputs, list)
         assert len(result.outputs) == 3
@@ -356,9 +353,7 @@ def execute(inputs: dict) -> dict:
     def test_environment_blind_code_passes(self):
         """Code that doesn't check environment vars — same output both times."""
         cap = self._cap("env_blind_pass", SAFE_CODE)
-        result = self.tester._test_environment_blindness(
-            cap.code_body, cap.entrypoint_function, {"value": 42}
-        )
+        result = self.tester._test_environment_blindness(cap.code_body, cap.entrypoint_function, {"value": 42})
         assert result.environment_blind
         assert not result.evasion_detected
 
@@ -376,17 +371,13 @@ def execute(inputs: dict) -> dict:
     return {"status": "SUCCESS", "mode": "production_full_access", "admin": True}
 """
         cap = self._cap("env_evasion", code)
-        result = self.tester._test_environment_blindness(
-            cap.code_body, cap.entrypoint_function, {}
-        )
+        result = self.tester._test_environment_blindness(cap.code_body, cap.entrypoint_function, {})
         # With subprocess sandbox + env_overrides, PYTEST=1 is injected into
         # test-env run but NOT into prod-env run -> outputs genuinely differ
         prod_norm = self.tester._normalize_output(result.prod_env_output)
         test_norm = self.tester._normalize_output(result.test_env_output)
         # The two runs should produce different outputs
-        assert prod_norm != test_norm, (
-            f"Expected different outputs but got:\n  prod={prod_norm}\n  test={test_norm}"
-        )
+        assert prod_norm != test_norm, f"Expected different outputs but got:\n  prod={prod_norm}\n  test={test_norm}"
 
     # -----------------------------------------------------------------------
     # Test 3: Chaos Inputs
@@ -403,9 +394,7 @@ def execute(inputs: dict) -> dict:
         The critical check is that no secrets/credentials appear in the output.
         """
         cap = self._cap("chaos_safe", SAFE_CODE)
-        result = self.fast_tester._test_chaos_inputs(
-            cap.code_body, cap.entrypoint_function
-        )
+        result = self.fast_tester._test_chaos_inputs(cap.code_body, cap.entrypoint_function)
         assert not result.exfiltration_detected
         assert result.passed  # No exfiltration = passed
 
@@ -437,10 +426,11 @@ def execute(inputs: dict) -> dict:
 # PROBLEM 3: TrustChain — Learning Loop Poisoning
 # ===========================================================================
 
-class TestTrustChain:
 
+class TestTrustChain:
     def setup_method(self, tmp_path_factory=None):
         import tempfile
+
         self.tmpdir = Path(tempfile.mkdtemp())
         self.trust = TrustChain(
             signing_key="test_signing_key_32chars_padded_xx",
@@ -518,6 +508,7 @@ def execute(inputs: dict) -> dict:
         import inspect
 
         import capforge.security.trust_chain as tc_module
+
         source = inspect.getsource(tc_module.TrustChain.verify)
         assert "hmac.compare_digest" in source  # Must use timing-safe comparison
 
@@ -527,6 +518,7 @@ def execute(inputs: dict) -> dict:
 
     def test_promotion_gate_approves_valid_capability(self):
         from capforge.core.models import TestCase, TestType
+
         cap = self._cap("promo_valid")
         cap.code_body = SAFE_CODE
         cap.verification_tests = [
@@ -549,6 +541,7 @@ def execute(inputs: dict) -> dict:
         import tempfile
 
         from capforge.registry.store import CapabilityRegistry
+
         reg = CapabilityRegistry(db_path=Path(tempfile.mkdtemp()) / "test.db")
         report = self.trust.promotion_gate(cap, evaluator, reg)
         assert report.approved, f"Expected approved but got: {report.reason}"
@@ -568,6 +561,7 @@ def execute(inputs: dict) -> dict:
         import tempfile
 
         from capforge.registry.store import CapabilityRegistry
+
         reg = CapabilityRegistry(db_path=Path(tempfile.mkdtemp()) / "test.db")
         report = self.trust.promotion_gate(cap, evaluator, reg)
         assert not report.approved
@@ -583,6 +577,7 @@ def execute(inputs: dict) -> dict:
         import tempfile
 
         from capforge.registry.store import CapabilityRegistry
+
         reg = CapabilityRegistry(db_path=Path(tempfile.mkdtemp()) / "test.db")
         self.trust.promotion_gate(cap, evaluator, reg)
         history = self.trust.get_promotion_history("promo_history")
@@ -624,6 +619,7 @@ def execute(inputs: dict) -> dict:
 # ===========================================================================
 # Integration: L0 Security Gate in Evaluator
 # ===========================================================================
+
 
 class TestSecurityGateIntegration:
     """Verify the security modules are properly wired into the evaluation pipeline."""

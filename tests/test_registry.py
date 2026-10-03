@@ -34,7 +34,7 @@ def test_register_and_retrieve_capability(temp_registry):
         description="Fetches data from test endpoints",
         domain="testing",
         code_body="def execute(inputs): return {'status': 'OK'}",
-        entrypoint_function="execute"
+        entrypoint_function="execute",
     )
 
     registered = temp_registry.register(cap)
@@ -53,7 +53,7 @@ def test_versioning_and_rollback(temp_registry):
         version="1.0.0",
         status=CapabilityStatus.ACTIVE,
         description="Version 1",
-        code_body="def execute(inputs): return 1"
+        code_body="def execute(inputs): return 1",
     )
     temp_registry.register(v1)
 
@@ -63,7 +63,7 @@ def test_versioning_and_rollback(temp_registry):
         version="1.1.0",
         status=CapabilityStatus.ACTIVE,
         description="Version 2",
-        code_body="def execute(inputs): return 2"
+        code_body="def execute(inputs): return 2",
     )
     temp_registry.register(v2)
 
@@ -98,6 +98,7 @@ def test_capability_id_validation():
 def test_semantic_fuzzy_search(temp_registry):
     """Verify that character n-gram fuzzy matching finds capabilities despite slight typos."""
     from capforge.registry.search import CapabilityMatcher
+
     cap = Capability(
         id="kubernetes_ingress_analyzer",
         name="Kubernetes Ingress Controller Diagnostics",

@@ -40,9 +40,9 @@ def test_regression_blocks_breaking_version(temp_registry):
                 name="Must preserve task 1 contract",
                 test_type=TestType.HAPPY_PATH,
                 inputs={"id": 1},
-                assert_expression="output.get('task_id') == 1"
+                assert_expression="output.get('task_id') == 1",
             )
-        ]
+        ],
     )
     vm.promote_to_active(v1, skip_regression=True, skip_risk_check=True)
 
@@ -59,9 +59,9 @@ def test_regression_blocks_breaking_version(temp_registry):
                 name="Must work for task 2",
                 test_type=TestType.HAPPY_PATH,
                 inputs={"id": 2},
-                assert_expression="output.get('status') == 'OK'"
+                assert_expression="output.get('status') == 'OK'",
             )
-        ]
+        ],
     )
 
     # Promoting v2 MUST raise RegressionDetectedError because test_task_1 fails!

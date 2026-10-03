@@ -25,6 +25,7 @@ client = TestClient(app)
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _register_simple_cap(cap_id: str = "e2e_demo_cap") -> dict:
     """Register a simple working capability for e2e testing."""
     payload = {
@@ -68,6 +69,7 @@ def _register_simple_cap(cap_id: str = "e2e_demo_cap") -> dict:
 # Step 1: Gap Detection
 # ---------------------------------------------------------------------------
 
+
 def test_e2e_step1_gap_analysis():
     """Analyze a task intent — system must detect and report capability gap."""
     resp = client.post(
@@ -84,6 +86,7 @@ def test_e2e_step1_gap_analysis():
 # Step 2: Learning Job (Synthesis)
 # ---------------------------------------------------------------------------
 
+
 def test_e2e_step2_learning_job_creates_capability():
     """Create a learning job — it must produce and register a capability."""
     resp = client.post(
@@ -98,14 +101,16 @@ def test_e2e_step2_learning_job_creates_capability():
     # COMPLETED = synthesized and passed verification
     # FAILED = synthesized but template code failed sandbox (no LLM configured)
     # RUNNING = async (shouldn't happen in sync mode)
-    assert job["status"] in ("COMPLETED", "FAILED", "FAILED_VERIFICATION", "RUNNING"), \
+    assert job["status"] in ("COMPLETED", "FAILED", "FAILED_VERIFICATION", "RUNNING"), (
         f"Unexpected job status: {job['status']}"
+    )
     assert "job_id" in job
 
 
 # ---------------------------------------------------------------------------
 # Step 3: Evaluate (4-Level Battery)
 # ---------------------------------------------------------------------------
+
 
 def test_e2e_step3_evaluate_capability():
     """Evaluate a registered capability — all 4 levels must run."""
@@ -129,6 +134,7 @@ def test_e2e_step3_evaluate_capability():
 # Step 4: Promote to ACTIVE
 # ---------------------------------------------------------------------------
 
+
 def test_e2e_step4_promote_capability():
     """Promote a capability — status must transition to ACTIVE."""
     _register_simple_cap("e2e_promote_cap")
@@ -143,6 +149,7 @@ def test_e2e_step4_promote_capability():
 # ---------------------------------------------------------------------------
 # Step 5: Execute
 # ---------------------------------------------------------------------------
+
 
 def test_e2e_step5_execute_capability():
     """Execute the promoted capability — must return SUCCESS output."""
@@ -167,6 +174,7 @@ def test_e2e_step5_execute_capability():
 # Step 6: Version History
 # ---------------------------------------------------------------------------
 
+
 def test_e2e_step6_version_history():
     """After registration, version history must contain at least one entry."""
     _register_simple_cap("e2e_version_cap")
@@ -182,6 +190,7 @@ def test_e2e_step6_version_history():
 # ---------------------------------------------------------------------------
 # Step 7: Hybrid Search
 # ---------------------------------------------------------------------------
+
 
 def test_e2e_step7_hybrid_search_returns_results():
     """Hybrid search must return ranked capability results for a semantic query."""
@@ -203,6 +212,7 @@ def test_e2e_step7_hybrid_search_returns_results():
 # Step 8: Platform Health
 # ---------------------------------------------------------------------------
 
+
 def test_e2e_step8_health_endpoints():
     """Both /health and /health/ready must return OK status."""
     health = client.get("/health")
@@ -219,6 +229,7 @@ def test_e2e_step8_health_endpoints():
 # ---------------------------------------------------------------------------
 # Step 9: Manifest Round-trip
 # ---------------------------------------------------------------------------
+
 
 def test_e2e_step9_manifest_export_import():
     """Export a capability manifest and re-import it — must produce a valid capability."""

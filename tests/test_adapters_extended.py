@@ -22,7 +22,9 @@ def multi_adapter_env(tmp_path):
         description="Analyzes customer sentiment score",
         inputs={
             "text": ParameterSpec(name="text", type="string", description="Review text", required=True),
-            "neutral_threshold": ParameterSpec(name="neutral_threshold", type="number", description="Threshold", required=False, default=0.5),
+            "neutral_threshold": ParameterSpec(
+                name="neutral_threshold", type="number", description="Threshold", required=False, default=0.5
+            ),
         },
         status=CapabilityStatus.ACTIVE,
         code_body="""def execute(inputs):

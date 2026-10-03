@@ -10,9 +10,7 @@ def _make_cap(cap_id: str, deps: list[str] = None) -> Capability:
         name=cap_id.replace("_", " ").title(),
         description=f"Test capability {cap_id}",
         code_body="def execute(inputs): return {}",
-        dependencies=[
-            CapabilityDependency(capability_id=d) for d in (deps or [])
-        ],
+        dependencies=[CapabilityDependency(capability_id=d) for d in (deps or [])],
     )
 
 

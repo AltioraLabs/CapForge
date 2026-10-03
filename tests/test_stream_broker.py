@@ -1,6 +1,5 @@
 """Tests for CapForge Distributed Event Stream Broker (v0.7.0)."""
 
-
 import pytest
 from fastapi.testclient import TestClient
 

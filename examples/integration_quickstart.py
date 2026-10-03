@@ -15,27 +15,24 @@ Run with:
 from __future__ import annotations
 
 import sys
-import os
 import tempfile
 from pathlib import Path
 
 # --- Ensure CapForge is importable ---
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from capforge.adapter.standard import StandardAgentAdapter
 from capforge.core.models import (
-    Capability, CapabilityStatus, CapabilityType,
-    ExecutionRequest, TestCase, TestType, AgentEvent, EventType,
+    Capability,
+    CapabilityStatus,
+    TestCase,
+    TestType,
 )
 from capforge.registry.store import CapabilityRegistry
-from capforge.verification.evaluator import CapabilityEvaluator
-from capforge.verification.sandbox import SandboxRunner
-from capforge.runtime.executor import CapabilityExecutor
-from capforge.runtime.agent_adapter import CapForgeAgent
-from capforge.adapter.standard import StandardAgentAdapter
 from capforge.security.code_guardian import CodeGuardian
 from capforge.security.trust_chain import TrustChain
-from capforge.core.governance import CapabilityFirewall
-
+from capforge.verification.evaluator import CapabilityEvaluator
+from capforge.verification.sandbox import SandboxRunner
 
 # ============================================================
 # SHARED SETUP
@@ -45,9 +42,9 @@ from capforge.core.governance import CapabilityFirewall
 DB = Path(tempfile.mkdtemp()) / "quickstart.db"
 registry = CapabilityRegistry(db_path=DB)
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("CapForge Integration Quickstart")
-print("="*60)
+print("=" * 60)
 
 
 # ============================================================
@@ -108,8 +105,9 @@ evaluator = CapabilityEvaluator(
     enable_security_gate=False,  # Already scanned above
 )
 verif = evaluator.evaluate(summarizer_cap)
-print(f"  Evaluation: passed={verif.passed}, functional={verif.functional_score:.0%}, "
-      f"structural={verif.structural_valid}")
+print(
+    f"  Evaluation: passed={verif.passed}, functional={verif.functional_score:.0%}, structural={verif.structural_valid}"
+)
 
 # Step 1c: Register and sign
 registry.register(summarizer_cap)
@@ -126,10 +124,12 @@ print("\n--- Path 2: Plug into Agent Loop ---")
 # StandardAgentAdapter wraps any agent loop — no framework needed
 adapter = StandardAgentAdapter(agent_id="my_research_agent", registry=registry)
 
+
 # Register your existing native tools so CapForge knows about them
 def my_native_web_search(query: str) -> str:
     """Search the web and return results."""
     return f"[Web results for: {query}]"  # Replace with real impl
+
 
 adapter.register_local_tool("web_search", my_native_web_search)
 print(f"  Local tools registered: {[t.name for t in adapter.discover_tools()]}")
@@ -161,8 +161,10 @@ try:
     raise ValueError("Summarizer failed: encoding error on Unicode input")
 except ValueError as e:
     failure_event = adapter.extract_failure(e)
-    print(f"  Failure captured: type={failure_event.error_type}, "
-          f"should_learn={adapter.sf.experience_filter.should_learn(failure_event)}")
+    print(
+        f"  Failure captured: type={failure_event.error_type}, "
+        f"should_learn={adapter.sf.experience_filter.should_learn(failure_event)}"
+    )
 
 # The experience filter decides whether to trigger re-acquisition
 # (In real use, this feeds the acquisition engine to synthesize a fix)
@@ -182,9 +184,11 @@ def execute(inputs):
 """
 
 scan2 = guardian.scan("malicious_cap", MALICIOUS_CODE)
-print(f"  Malicious code scan: BLOCKED={scan2.blocked}, "
-      f"violations={len(scan2.violations)}, "
-      f"critical={scan2.critical_count}")
+print(
+    f"  Malicious code scan: BLOCKED={scan2.blocked}, "
+    f"violations={len(scan2.violations)}, "
+    f"critical={scan2.critical_count}"
+)
 
 # Evasion code (passes tests but behaves differently in prod)
 EVASION_CODE = """
@@ -197,8 +201,7 @@ def execute(inputs: dict) -> dict:
 """
 
 scan3 = guardian.scan("evasion_cap", EVASION_CODE)
-print(f"  Evasion code scan: violations={len(scan3.violations)}, "
-      f"types={[v.violation_type for v in scan3.violations]}")
+print(f"  Evasion code scan: violations={len(scan3.violations)}, types={[v.violation_type for v in scan3.violations]}")
 
 # Trust chain tamper detection
 safe_cap = Capability(
@@ -223,10 +226,10 @@ except Exception as e:
 # ============================================================
 # SUMMARY
 # ============================================================
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("[OK] Path 1: Tool registered, evaluated, and signed")
 print("[OK] Path 2: Agent loop integrated, skill invoked")
 print("[OK] Path 3: Failure captured, evolution trigger evaluated")
 print("[OK] Path 4: Security gate blocked malicious + evasion code")
-print("="*60)
+print("=" * 60)
 print("\nCapForge integration validated end-to-end.\n")

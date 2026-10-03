@@ -33,12 +33,15 @@ def _make_key(mgr: AuthManager, role: UserRole, namespace: str = "default") -> s
 # 1. Missing key → 401 (only in non-dev-mode)
 # ---------------------------------------------------------------------------
 
+
 def test_missing_key_returns_401_on_protected_route(monkeypatch):
     """POST /v1/auth/keys without a key should 401 when dev_mode is False."""
     from capforge.core import config as cfg_module
+
     monkeypatch.setattr(cfg_module.settings, "dev_mode", False)
     # Patch the auth dependency's settings reference
     from capforge.server import auth as auth_module
+
     monkeypatch.setattr(auth_module.settings, "dev_mode", False)
 
     resp = client.post("/v1/auth/keys", json={"name": "test", "role": "AGENT_RUNNER"})
@@ -49,6 +52,7 @@ def test_missing_key_returns_401_on_protected_route(monkeypatch):
 # 2. Invalid token → 401
 # ---------------------------------------------------------------------------
 
+
 def test_invalid_api_key_returns_401():
     """A garbage token must be rejected with 401."""
     resp = client.get("/v1/auth/keys", headers={"X-CapForge-Key": "sf_live_thisisnotatoken"})
@@ -58,6 +62,7 @@ def test_invalid_api_key_returns_401():
 # ---------------------------------------------------------------------------
 # 3. Revoked key → 401
 # ---------------------------------------------------------------------------
+
 
 def test_revoked_key_returns_401(fresh_auth_manager):
     """After revocation, the key must be rejected."""
@@ -80,10 +85,12 @@ def test_revoked_key_returns_401(fresh_auth_manager):
 # 4. Role enforcement — AGENT_RUNNER cannot provision keys (needs ADMIN/OPERATOR)
 # ---------------------------------------------------------------------------
 
+
 def test_agent_runner_cannot_create_api_keys(fresh_auth_manager):
     """AGENT_RUNNER role is forbidden from POST /v1/auth/keys."""
     runner_token, _ = fresh_auth_manager.create_api_key("runner", UserRole.AGENT_RUNNER)
     from capforge.server import auth as auth_module
+
     original = auth_module.auth_manager
     auth_module.auth_manager = fresh_auth_manager
     try:
@@ -101,6 +108,7 @@ def test_auditor_cannot_create_api_keys(fresh_auth_manager):
     """AUDITOR role is also forbidden from provisioning keys."""
     auditor_token, _ = fresh_auth_manager.create_api_key("auditor", UserRole.AUDITOR)
     from capforge.server import auth as auth_module
+
     original = auth_module.auth_manager
     auth_module.auth_manager = fresh_auth_manager
     try:
@@ -118,12 +126,12 @@ def test_auditor_cannot_create_api_keys(fresh_auth_manager):
 # 5. ADMIN bypasses role checks
 # ---------------------------------------------------------------------------
 
+
 def test_admin_can_create_api_keys(fresh_auth_manager):
     """ADMIN role must be allowed to provision new keys."""
-    admin_token, _ = fresh_auth_manager.create_api_key(
-        name="admin", role=UserRole.ADMIN, tenant_namespace="*"
-    )
+    admin_token, _ = fresh_auth_manager.create_api_key(name="admin", role=UserRole.ADMIN, tenant_namespace="*")
     from capforge.server import auth as auth_module
+
     original = auth_module.auth_manager
     auth_module.auth_manager = fresh_auth_manager
     try:
@@ -143,6 +151,7 @@ def test_admin_can_create_api_keys(fresh_auth_manager):
 # ---------------------------------------------------------------------------
 # 6. Auth persistence — key survives AuthManager re-instantiation
 # ---------------------------------------------------------------------------
+
 
 def test_auth_key_persists_across_manager_restart(tmp_path):
     """Keys written to SQLite must survive AuthManager reconstruction."""

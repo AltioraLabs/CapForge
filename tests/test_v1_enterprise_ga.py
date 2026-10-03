@@ -15,6 +15,7 @@ from capforge.server.auth import AuthManager, UserRole
 @pytest.fixture
 def auth(tmp_path):
     from capforge.server.auth import AuthStore
+
     store = AuthStore(db_path=tmp_path / "auth_test.db")
     return AuthManager(store=store)
 

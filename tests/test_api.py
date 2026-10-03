@@ -38,9 +38,9 @@ class TestDashboardAPI:
 
 class TestDiscoveryAPI:
     def test_analyze_task(self, client):
-        resp = client.post("/v1/capabilities/analyze", json={
-            "task_intent": "Analyze GitHub repository for security vulnerabilities"
-        })
+        resp = client.post(
+            "/v1/capabilities/analyze", json={"task_intent": "Analyze GitHub repository for security vulnerabilities"}
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert "gap_detected" in data
@@ -48,27 +48,31 @@ class TestDiscoveryAPI:
 
     def test_search_capabilities(self, client):
         # Register capability first
-        client.post("/v1/capabilities/register", json={
-            "id": "searchable_security_scan",
-            "name": "Searchable Security Scan",
-            "description": "Scan container images for vulnerabilities",
-            "tags": ["security", "docker", "vulnerabilities"],
-            "code_body": "def execute(inputs): return {}",
-        })
+        client.post(
+            "/v1/capabilities/register",
+            json={
+                "id": "searchable_security_scan",
+                "name": "Searchable Security Scan",
+                "description": "Scan container images for vulnerabilities",
+                "tags": ["security", "docker", "vulnerabilities"],
+                "code_body": "def execute(inputs): return {}",
+            },
+        )
 
-        resp = client.post("/v1/capabilities/search", json={
-            "query": "security vulnerabilities docker",
-            "top_k": 3,
-        })
+        resp = client.post(
+            "/v1/capabilities/search",
+            json={
+                "query": "security vulnerabilities docker",
+                "top_k": 3,
+            },
+        )
         assert resp.status_code == 200
         results = resp.json()
         assert isinstance(results, list)
         assert any(c["id"] == "searchable_security_scan" for c in results)
 
     def test_legacy_analyze_still_works(self, client):
-        resp = client.post("/api/tasks/analyze", json={
-            "task_intent": "Simple task"
-        })
+        resp = client.post("/api/tasks/analyze", json={"task_intent": "Simple task"})
         assert resp.status_code == 200
 
 
@@ -98,12 +102,15 @@ class TestManifestAPI:
     def test_manifest_export_and_import(self, client):
         # Register a test capability
         cap_id = "manifest_test_cap"
-        client.post("/v1/capabilities/register", json={
-            "id": cap_id,
-            "name": "Manifest Test Cap",
-            "description": "Test manifest export/import",
-            "code_body": "def execute(inputs): return {'status': 'ok'}",
-        })
+        client.post(
+            "/v1/capabilities/register",
+            json={
+                "id": cap_id,
+                "name": "Manifest Test Cap",
+                "description": "Test manifest export/import",
+                "code_body": "def execute(inputs): return {'status': 'ok'}",
+            },
+        )
 
         # 1. Export
         resp = client.get(f"/v1/capabilities/{cap_id}/manifest")
@@ -123,15 +130,18 @@ class TestManifestAPI:
 
 class TestLearningJobsAPI:
     def test_create_and_get_learning_job(self, client):
-        resp = client.post("/v1/learning/jobs", json={
-            "task_intent": "Analyze pod network latency",
-            "task_inputs": {"pod": "gateway"},
-            "knowledge_spec": {
-                "id": "pod_network_latency",
-                "name": "Pod Network Latency Analyzer",
-                "code_body": "def execute(pod=''): return {'status': 'SUCCESS', 'latency_ms': 12}",
+        resp = client.post(
+            "/v1/learning/jobs",
+            json={
+                "task_intent": "Analyze pod network latency",
+                "task_inputs": {"pod": "gateway"},
+                "knowledge_spec": {
+                    "id": "pod_network_latency",
+                    "name": "Pod Network Latency Analyzer",
+                    "code_body": "def execute(pod=''): return {'status': 'SUCCESS', 'latency_ms': 12}",
+                },
             },
-        })
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["job_id"].startswith("job_")
@@ -186,12 +196,15 @@ class TestMCPAndPipelineAPI:
         assert len(tools) >= 5
 
     def test_mcp_rpc_endpoint(self, client):
-        resp = client.post("/mcp/rpc", json={
-            "jsonrpc": "2.0",
-            "id": 100,
-            "method": "ping",
-            "params": {},
-        })
+        resp = client.post(
+            "/mcp/rpc",
+            json={
+                "jsonrpc": "2.0",
+                "id": 100,
+                "method": "ping",
+                "params": {},
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["jsonrpc"] == "2.0"
         assert resp.json()["id"] == 100
@@ -297,7 +310,3 @@ class TestBudgetAndBenchmarkAPI:
         assert "[REDACTED_EMAIL]" in data["sanitized_text"]
         assert data["sanitized_data"]["secret_token"] == "[REDACTED_SECRET]"
         assert data["sanitized_data"]["count"] == 10
-
-
-
-

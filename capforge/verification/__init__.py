@@ -23,4 +23,3 @@ __all__ = [
     "MultiDimensionalReport",
     "benchmark_registry",
 ]
-

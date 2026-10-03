@@ -151,4 +151,3 @@ class TestCapabilityFirewall:
         decision = fw.check(cap, req)
         assert decision.allowed is False
         assert "AST" in decision.blocked_reason or "prohibited" in decision.blocked_reason
-

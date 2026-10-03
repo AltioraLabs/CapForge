@@ -50,7 +50,7 @@ def test_gap_resolved_after_registration(temp_registry):
         description="Extracts telemetry metrics and audits anomalies from QuantumMetrics API",
         tags=["telemetry", "anomaly", "quantummetrics", "audit"],
         domain="data_analysis",
-        code_body="def execute(inputs): return {'status': 'SUCCESS'}"
+        code_body="def execute(inputs): return {'status': 'SUCCESS'}",
     )
     temp_registry.register(cap)
 

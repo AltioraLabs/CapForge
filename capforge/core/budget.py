@@ -149,7 +149,9 @@ class EvolutionBudgetManager:
             "max_daily_calls": self.config.max_llm_calls_per_day,
             "daily_cost_usd": round(self._daily_cost_usd, 4),
             "max_cost_usd": self.config.max_cost_per_day_usd,
-            "cost_utilization_pct": round((self._daily_cost_usd / max(self.config.max_cost_per_day_usd, 0.01)) * 100, 2),
+            "cost_utilization_pct": round(
+                (self._daily_cost_usd / max(self.config.max_cost_per_day_usd, 0.01)) * 100, 2
+            ),
             "daily_sandbox_runs": self._daily_sandbox_runs,
             "max_sandbox_runs": self.config.max_sandbox_runs_per_day,
         }

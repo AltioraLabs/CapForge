@@ -33,6 +33,7 @@ from capforge.verification.sandbox import SandboxRunner
 # 1. Sandbox Timeout — infinite loop must be killed
 # ---------------------------------------------------------------------------
 
+
 def test_sandbox_kills_infinite_loop():
     """Sandbox must enforce timeout on infinite loops and return FAILED."""
     sandbox = SandboxRunner(use_subprocess=True)
@@ -49,8 +50,9 @@ def execute(inputs):
     assert result["success"] is False, "Infinite loop must not succeed"
     assert elapsed < 6.0, f"Timeout must fire within 6s, took {elapsed:.1f}s"
     error_lower = (result.get("error") or "").lower()
-    assert any(kw in error_lower for kw in ("timeout", "time", "killed", "signal", "terminated")), \
+    assert any(kw in error_lower for kw in ("timeout", "time", "killed", "signal", "terminated")), (
         f"Expected timeout error, got: {result['error']}"
+    )
 
 
 def test_sandbox_timeout_short_window():
@@ -69,6 +71,7 @@ def execute(inputs):
 # ---------------------------------------------------------------------------
 # 2. Circuit Breaker — 3 consecutive failures trigger quarantine + rollback
 # ---------------------------------------------------------------------------
+
 
 def _make_cap(cap_id: str, version: str, code: str, parent_version: str = None) -> Capability:
     cap = Capability(
@@ -109,18 +112,21 @@ def test_circuit_breaker_trips_and_quarantines(tmp_path):
 
     # Verify child was quarantined
     child_after = registry.get("cb_test", version="2.0.0")
-    assert child_after.status == CapabilityStatus.QUARANTINED, \
+    assert child_after.status == CapabilityStatus.QUARANTINED, (
         f"Expected QUARANTINED after circuit trip, got {child_after.status}"
+    )
 
     # Verify parent was restored to ACTIVE
     parent_after = registry.get("cb_test", version="1.0.0")
-    assert parent_after.status == CapabilityStatus.ACTIVE, \
+    assert parent_after.status == CapabilityStatus.ACTIVE, (
         f"Expected parent ACTIVE after rollback, got {parent_after.status}"
+    )
 
 
 # ---------------------------------------------------------------------------
 # 3. Firewall blocks quarantined capability
 # ---------------------------------------------------------------------------
+
 
 def test_firewall_blocks_quarantined_capability(tmp_path):
     """Executor must return BLOCKED (not execute) a QUARANTINED capability."""
@@ -146,6 +152,7 @@ def test_firewall_blocks_quarantined_capability(tmp_path):
 # ---------------------------------------------------------------------------
 # 4. Vector index auto-refresh
 # ---------------------------------------------------------------------------
+
 
 def test_vector_index_refreshes_on_new_registration(tmp_path):
     """Capabilities registered after index creation must be searchable."""
@@ -175,13 +182,13 @@ def test_vector_index_refreshes_on_new_registration(tmp_path):
     # Now it must appear in search results
     results_after = index.search_vector("email sending capability", top_k=10)
     found_ids = {cap.id for cap, _ in results_after}
-    assert "send_email_v2" in found_ids, \
-        f"Newly registered cap must appear in search. Found: {found_ids}"
+    assert "send_email_v2" in found_ids, f"Newly registered cap must appear in search. Found: {found_ids}"
 
 
 # ---------------------------------------------------------------------------
 # 5. Workflow pause on failure + resume
 # ---------------------------------------------------------------------------
+
 
 def test_workflow_pauses_on_step_failure_and_resumes(tmp_path):
     """A workflow must pause when a step fails and resume correctly from checkpoint."""
@@ -195,10 +202,22 @@ def test_workflow_pauses_on_step_failure_and_resumes(tmp_path):
     step1_code = "def execute(inputs): return {'status': 'SUCCESS', 'value': 42}"
     step2_code = "def execute(inputs): return {'status': 'SUCCESS', 'final': True}"
 
-    cap1 = Capability(id="wf_step1", name="WF Step 1", description="Step 1",
-                      version="1.0.0", code_body=step1_code, status=CapabilityStatus.ACTIVE)
-    cap2 = Capability(id="wf_step2", name="WF Step 2", description="Step 2",
-                      version="1.0.0", code_body=step2_code, status=CapabilityStatus.ACTIVE)
+    cap1 = Capability(
+        id="wf_step1",
+        name="WF Step 1",
+        description="Step 1",
+        version="1.0.0",
+        code_body=step1_code,
+        status=CapabilityStatus.ACTIVE,
+    )
+    cap2 = Capability(
+        id="wf_step2",
+        name="WF Step 2",
+        description="Step 2",
+        version="1.0.0",
+        code_body=step2_code,
+        status=CapabilityStatus.ACTIVE,
+    )
     registry.register(cap1)
     registry.register(cap2)
 
@@ -213,13 +232,15 @@ def test_workflow_pauses_on_step_failure_and_resumes(tmp_path):
 
     state = engine.start_workflow(workflow=workflow, inputs={}, run_id="test_run_001")
     # Workflow should complete (both steps succeed)
-    assert state.status in (WorkflowStatus.COMPLETED, WorkflowStatus.RUNNING), \
+    assert state.status in (WorkflowStatus.COMPLETED, WorkflowStatus.RUNNING), (
         f"Unexpected workflow status: {state.status}"
+    )
 
 
 # ---------------------------------------------------------------------------
 # 6. Registry pagination
 # ---------------------------------------------------------------------------
+
 
 def test_registry_pagination_returns_correct_slices(tmp_path):
     """list_capabilities with limit/offset must return correct slices."""

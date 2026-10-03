@@ -378,5 +378,232 @@ def run_health_check():
     console.print(table)
 
 
+# ---------------------------------------------------------------------------
+# Project Scaffolding: capforge init
+# ---------------------------------------------------------------------------
+
+
+@app.command("init")
+def init_project(
+    project_dir: str = typer.Argument(".", help="Directory to initialize (defaults to current)"),
+    project_name: str = typer.Option(None, "--name", "-n", help="Project name"),
+):
+    """Initialize a new CapForge-integrated project with sample capabilities, tests, and config."""
+    import os
+
+    target = os.path.abspath(project_dir)
+    name = project_name or os.path.basename(target) or "my_capforge_project"
+
+    dirs_to_create = [
+        os.path.join(target, "capabilities"),
+        os.path.join(target, "capabilities", "manifests"),
+        os.path.join(target, "tests"),
+    ]
+    for d in dirs_to_create:
+        os.makedirs(d, exist_ok=True)
+
+    config_path = os.path.join(target, "capforge.yaml")
+    if not os.path.exists(config_path):
+        config_content = f"""# CapForge Project Configuration
+project_name: "{name}"
+version: "1.0.0"
+
+# Server settings
+server:
+  host: "127.0.0.1"
+  port: 8000
+
+# Security settings
+security:
+  enable_trust_chain: false
+  block_on_critical: true
+  auto_evaluate: true
+
+# Evolution settings
+evolution:
+  enabled: false
+  max_llm_calls_per_hour: 50
+  max_cost_per_day_usd: 10.0
+
+# Database
+storage:
+  db_path: "data/capforge.db"
+"""
+        with open(config_path, "w", encoding="utf-8") as f:
+            f.write(config_content)
+
+    sample_cap_path = os.path.join(target, "capabilities", "sample_capability.py")
+    if not os.path.exists(sample_cap_path):
+        sample_content = '''"""Sample CapForge capability demonstrating the @capability decorator."""
+
+from capforge import capability
+
+
+@capability(
+    id="text_word_count",
+    name="Text Word Counter",
+    domain="nlp",
+    risk_level="LOW",
+    tags=["text", "utility"],
+    tests=[
+        {
+            "id": "test_basic",
+            "name": "Basic word count",
+            "inputs": {"text": "hello world foo"},
+            "expected_keys": ["word_count"],
+            "assert_expression": "output['word_count'] == 3",
+        },
+        {
+            "id": "test_empty",
+            "name": "Empty input",
+            "inputs": {"text": ""},
+            "expected_keys": ["word_count"],
+            "assert_expression": "output['word_count'] == 0",
+        },
+    ],
+)
+def text_word_count(text: str = "") -> dict:
+    """Count the number of words in the given text."""
+    words = text.split()
+    return {
+        "word_count": len(words),
+        "characters": len(text),
+        "words": words,
+    }
+'''
+        with open(sample_cap_path, "w", encoding="utf-8") as f:
+            f.write(sample_content)
+
+    integration_path = os.path.join(target, "capabilities", "register_all.py")
+    if not os.path.exists(integration_path):
+        integration_content = '''"""Register all project capabilities with CapForge."""
+
+from capforge import CapForgeClient
+from capabilities.sample_capability import text_word_count
+
+
+def main():
+    client = CapForgeClient(enable_security_scan=True, auto_evaluate=True)
+
+    cap = client.register(text_word_count, promote=True)
+    print(f"Registered: {cap.id} v{cap.version} (status={cap.status.value})")
+
+    health = client.health_check()
+    print(f"Health: {health}")
+
+
+if __name__ == "__main__":
+    main()
+'''
+        with open(integration_path, "w", encoding="utf-8") as f:
+            f.write(integration_content)
+
+    test_path = os.path.join(target, "tests", "test_capabilities.py")
+    if not os.path.exists(test_path):
+        test_content = '''"""Test suite for project capabilities."""
+
+from capforge import CapForgeClient
+
+
+def test_word_count_registration():
+    """Test that the sample capability registers and evaluates correctly."""
+    from capabilities.sample_capability import text_word_count
+
+    client = CapForgeClient(enable_security_scan=False, auto_evaluate=True)
+    cap = client.register(text_word_count, promote=True)
+    assert cap.status.value == "ACTIVE"
+
+    result = client.execute("text_word_count", {"text": "hello world"})
+    assert result.status == "SUCCESS"
+    assert result.output["word_count"] == 2
+'''
+        with open(test_path, "w", encoding="utf-8") as f:
+            f.write(test_content)
+
+    console.print(f"\n[bold green]Initialized CapForge project '{name}' at {target}[/bold green]\n")
+    console.print("[cyan]Created:[/cyan]")
+    console.print("  [dim]capforge.yaml[/dim]                    - Project configuration")
+    console.print("  [dim]capabilities/[/dim]                     - Capability source directory")
+    console.print("  [dim]capabilities/sample_capability.py[/dim] - Sample @capability decorator")
+    console.print("  [dim]capabilities/register_all.py[/dim]     - Registration script")
+    console.print("  [dim]tests/test_capabilities.py[/dim]         - Sample test suite")
+    console.print("\n[bold]Next steps:[/bold]")
+    console.print(f"  1. [cyan]cd {target}[/cyan]")
+    console.print("  2. [cyan]capforge check[/cyan]                  - Verify environment and dependencies")
+    console.print("  3. [cyan]python capabilities/register_all.py[/cyan] - Register capabilities")
+    console.print("  4. [cyan]capforge list[/cyan]                   - View registered capabilities")
+
+
+# ---------------------------------------------------------------------------
+# Webhooks CLI: capforge webhooks, webhook-add, webhook-remove
+# ---------------------------------------------------------------------------
+
+
+@app.command("webhooks")
+def list_webhooks():
+    """List all registered webhook subscriptions and delivery status."""
+    from capforge.events.webhooks import webhook_manager
+
+    subs = webhook_manager.list_subscriptions(active_only=False)
+    if not subs:
+        console.print("[yellow]No webhook subscriptions registered.[/yellow]")
+        return
+
+    table = Table(title="CapForge Webhook Subscriptions")
+    table.add_column("ID", style="dim", no_wrap=True)
+    table.add_column("URL", style="cyan")
+    table.add_column("Events", style="magenta")
+    table.add_column("Active", justify="center")
+    table.add_column("Failures", justify="right")
+    table.add_column("Description")
+
+    for s in subs:
+        table.add_row(
+            s.id[:8] + "...",
+            s.url,
+            ", ".join(s.events) if s.events else "(all)",
+            "[green]YES[/green]" if s.active else "[red]NO[/red]",
+            str(s.failure_count),
+            s.description or "-",
+        )
+
+    console.print(table)
+
+
+@app.command("webhook-add")
+def add_webhook(
+    url: str = typer.Argument(..., help="Callback destination URL"),
+    events: str = typer.Option("", "--events", "-e", help="Comma-separated event names (empty = all)"),
+    secret: str = typer.Option(None, "--secret", "-s", help="HMAC secret for signature verification"),
+    description: str = typer.Option("", "--desc", "-d", help="Description of webhook target"),
+):
+    """Register a new webhook callback URL."""
+    from capforge.events.webhooks import WebhookSubscription, webhook_manager
+
+    event_list = [ev.strip() for ev in events.split(",") if ev.strip()] if events else []
+    sub = WebhookSubscription(
+        url=url,
+        events=event_list,
+        secret=secret,
+        description=description,
+    )
+    registered = webhook_manager.register(sub)
+    console.print(f"[bold green]Registered webhook {registered.id} -> {registered.url}[/bold green]")
+
+
+@app.command("webhook-remove")
+def remove_webhook(
+    webhook_id: str = typer.Argument(..., help="ID of webhook to remove"),
+):
+    """Remove a webhook subscription by ID."""
+    from capforge.events.webhooks import webhook_manager
+
+    removed = webhook_manager.unregister(webhook_id)
+    if removed:
+        console.print(f"[green]Unregistered webhook {webhook_id}[/green]")
+    else:
+        console.print(f"[red]Webhook {webhook_id} not found[/red]")
+
+
 if __name__ == "__main__":
     app()

@@ -238,12 +238,31 @@ Heavy components such as sandbox, evaluation engine, registry, learning workers,
 ```
 
 The developer primarily interacts with first-class primitives:
-* Agent
-* Capability
-* Benchmark
-* Evaluation
-* Policy
-* Result
+* Agent (`CapForgeAgent`, framework adapters)
+* Capability (`Capability`, `@capability` decorator, `Capability.from_function`)
+* Client (`CapForgeClient` in-process or remote REST client)
+* Tool Schema (`to_tool()` / `as_tool()` OpenAI/Anthropic tool schemas)
+* Webhooks (`WebhookSubscription`, `WebhookManager`, HTTP callbacks)
+* Benchmark & Evaluation (`CapabilityEvaluator`, `BenchmarkSuite`)
+* Policy & Governance (`CapabilityFirewall`, `RiskEngine`, `CodeGuardian`)
+* Result & Trace (`ExecutionResponse`, `VerificationResult`, `AgentLifecycleTrace`)
+
+### High-Level SDK Developer Flow
+
+```python
+from capforge import CapForgeClient, capability
+
+# 1. Turn existing functions into verified capabilities
+@capability(id="summarize", domain="nlp", risk_level="LOW")
+def summarize_text(text: str) -> dict:
+    return {"summary": " ".join(text.split()[:30])}
+
+# 2. Use CapForgeClient for continuous evaluation & sandbox governance
+with CapForgeClient(enable_security_scan=True, auto_evaluate=True) as client:
+    cap = client.register(summarize_text, promote=True)
+    res = client.execute("summarize", {"text": "hello agent world"})
+    openai_tool = client.as_tool("summarize")
+```
 
 ---
 

@@ -1,6 +1,5 @@
 """Tests for CapForge LearningJobWorker asynchronous daemon."""
 
-
 import pytest
 
 from capforge.acquisition.jobs import LearningJobManager

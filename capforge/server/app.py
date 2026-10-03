@@ -48,6 +48,10 @@ from capforge.core.telemetry import trace_manager
 from capforge.discovery.capability_graph import CapabilityGraph, ImpactReport
 from capforge.discovery.gap_detector import CapabilityGapDetector
 from capforge.events.broker import StreamMessage
+from capforge.events.webhooks import (
+    WebhookSubscription,
+    webhook_manager,
+)
 from capforge.mcp.server import CapForgeMCPServer
 from capforge.registry.search import CapabilityMatcher
 from capforge.registry.store import CapabilityRegistry
@@ -385,7 +389,19 @@ def promote_capability(capability_id: str, req: PromoteRequest = Body(default=Pr
             skip_regression=req.skip_regression,
             skip_risk_check=req.skip_risk_check,
         )
-        return registry.get(capability_id)
+        promoted = registry.get(capability_id)
+        try:
+            webhook_manager.dispatch(
+                "skill_promoted",
+                {
+                    "capability_id": capability_id,
+                    "version": promoted.version if promoted else cap.version,
+                    "status": "ACTIVE",
+                },
+            )
+        except Exception:
+            pass
+        return promoted
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -766,6 +782,167 @@ def sanitize_trace_payload(req: SanitizeRequest):
     if req.data is not None:
         resp["sanitized_data"] = privacy_filter.sanitize_data(req.data)
     return resp
+
+
+# ---------------------------------------------------------------------------
+# Webhook Subscriptions (Event-Driven Integration)
+# ---------------------------------------------------------------------------
+
+
+class CreateWebhookRequest(BaseModel):
+    url: str
+    events: list[str] = Field(default_factory=list, description="Event types to subscribe to. Empty = all events.")
+    secret: str | None = Field(default=None, description="HMAC-SHA256 secret for payload signing.")
+    description: str = Field(default="")
+
+
+@app.post("/v1/webhooks", response_model=WebhookSubscription, tags=["Webhooks"])
+def create_webhook(req: CreateWebhookRequest):
+    """Register an HTTP webhook callback subscription."""
+    sub = WebhookSubscription(
+        url=req.url,
+        events=req.events,
+        secret=req.secret,
+        description=req.description,
+    )
+    return webhook_manager.register(sub)
+
+
+@app.get("/v1/webhooks", response_model=list[WebhookSubscription], tags=["Webhooks"])
+def list_webhooks(active_only: bool = Query(True)):
+    """List registered webhook subscriptions."""
+    return webhook_manager.list_subscriptions(active_only=active_only)
+
+
+@app.get("/v1/webhooks/{subscription_id}", response_model=WebhookSubscription, tags=["Webhooks"])
+def get_webhook(subscription_id: str):
+    """Get a specific webhook subscription by ID."""
+    sub = webhook_manager.get_subscription(subscription_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail=f"Webhook subscription '{subscription_id}' not found.")
+    return sub
+
+
+@app.delete("/v1/webhooks/{subscription_id}", tags=["Webhooks"])
+def delete_webhook(subscription_id: str):
+    """Delete a webhook subscription."""
+    deleted = webhook_manager.unregister(subscription_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Webhook subscription '{subscription_id}' not found.")
+    return {"deleted": True, "subscription_id": subscription_id}
+
+
+@app.post("/v1/webhooks/test", tags=["Webhooks"])
+def test_webhook_dispatch(
+    event_type: str = Body("test_ping", embed=True),
+    payload: dict[str, Any] = Body(default_factory=lambda: {"message": "Test event from CapForge"}),
+):
+    """Trigger a test event dispatch to matching webhook subscribers."""
+    deliveries = webhook_manager.dispatch(event_type, payload)
+    return {
+        "event_type": event_type,
+        "dispatched_count": len(deliveries),
+        "deliveries": [d.model_dump() for d in deliveries],
+    }
+
+
+@app.get("/v1/webhooks/deliveries", tags=["Webhooks"])
+def get_webhook_deliveries(
+    webhook_id: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+):
+    """Get recent webhook delivery logs."""
+    return [d.model_dump() for d in webhook_manager.get_delivery_log(webhook_id=webhook_id, limit=limit)]
+
+
+# ---------------------------------------------------------------------------
+# Batch Operations & Tool Definitions
+# ---------------------------------------------------------------------------
+
+
+class BatchRegisterRequest(BaseModel):
+    capabilities: list[Capability]
+    promote: bool = False
+
+
+class BatchRegisterResponse(BaseModel):
+    registered: list[Capability]
+    failed: list[dict[str, str]]
+
+
+@app.post("/v1/capabilities/batch-register", response_model=BatchRegisterResponse, tags=["Registry"])
+def batch_register_capabilities(req: BatchRegisterRequest):
+    """Register multiple capabilities in a single batch operation."""
+    registered: list[Capability] = []
+    failed: list[dict[str, str]] = []
+
+    for cap in req.capabilities:
+        try:
+            if req.promote:
+                cap.status = CapabilityStatus.ACTIVE
+            reg = registry.register(cap)
+            registered.append(reg)
+            webhook_manager.dispatch("capability_registered", {"capability_id": reg.id, "version": reg.version})
+        except Exception as e:
+            failed.append({"id": cap.id, "error": str(e)})
+
+    return BatchRegisterResponse(registered=registered, failed=failed)
+
+
+class BatchEvaluateRequest(BaseModel):
+    capability_ids: list[str]
+
+
+class BatchEvaluateResponse(BaseModel):
+    results: dict[str, VerificationResult]
+    failed: list[dict[str, str]]
+
+
+@app.post("/v1/capabilities/batch-evaluate", response_model=BatchEvaluateResponse, tags=["Verification"])
+def batch_evaluate_capabilities(req: BatchEvaluateRequest):
+    """Run verification evaluations on multiple capabilities."""
+    results: dict[str, VerificationResult] = {}
+    failed: list[dict[str, str]] = []
+
+    for cap_id in req.capability_ids:
+        cap = registry.get(cap_id)
+        if not cap:
+            failed.append({"id": cap_id, "error": f"Capability '{cap_id}' not found."})
+            continue
+        try:
+            ver = evaluator.evaluate(cap)
+            results[cap_id] = ver
+        except Exception as e:
+            failed.append({"id": cap_id, "error": str(e)})
+
+    return BatchEvaluateResponse(results=results, failed=failed)
+
+
+class BatchExecuteRequest(BaseModel):
+    requests: list[ExecutionRequest]
+
+
+class BatchExecuteResponse(BaseModel):
+    responses: list[ExecutionResponse]
+
+
+@app.post("/v1/capabilities/batch-execute", response_model=BatchExecuteResponse, tags=["Execution"])
+def batch_execute_capabilities(req: BatchExecuteRequest):
+    """Execute multiple capability requests in a batch."""
+    responses: list[ExecutionResponse] = []
+    for exec_req in req.requests:
+        res = executor.execute(exec_req)
+        responses.append(res)
+    return BatchExecuteResponse(responses=responses)
+
+
+@app.get("/v1/capabilities/{capability_id}/tool-def", tags=["Registry"])
+def get_capability_tool_definition(capability_id: str):
+    """Get the OpenAI/function-calling tool schema definition for a capability."""
+    cap = registry.get(capability_id)
+    if not cap:
+        raise HTTPException(status_code=404, detail=f"Capability '{capability_id}' not found.")
+    return cap.to_tool()
 
 
 # ---------------------------------------------------------------------------
