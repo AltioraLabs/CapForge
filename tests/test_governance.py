@@ -1,6 +1,6 @@
 """Unit tests for the Risk Engine and Capability Firewall."""
 
-import pytest
+from capforge.core.governance import CapabilityFirewall, RiskEngine
 from capforge.core.models import (
     Capability,
     CapabilityStatus,
@@ -10,7 +10,6 @@ from capforge.core.models import (
     ToolPermissions,
     ToolRequirement,
 )
-from capforge.core.governance import CapabilityFirewall, RiskEngine
 
 
 def _make_capability(**overrides) -> Capability:

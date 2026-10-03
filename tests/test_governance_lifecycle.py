@@ -1,8 +1,7 @@
 """Tests for CapForge Human Governance Review Lifecycle (v0.5.0)."""
 
-import pytest
-from capforge.core.models import Capability, RiskLevel, ToolPermissions
 from capforge.core.governance import RiskEngine
+from capforge.core.models import Capability, RiskLevel, ToolPermissions
 
 
 def test_ticket_approval_and_rejection_lifecycle():

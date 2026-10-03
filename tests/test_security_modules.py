@@ -15,17 +15,16 @@ Tests are organized by the three unsolved problems they address:
     injected false verification results.
 """
 
-import pytest
-import math
 from pathlib import Path
 
-from capforge.security.code_guardian import CodeGuardian, DANGEROUS_REGEX_PATTERNS
-from capforge.security.adversarial_tester import AdversarialTester
-from capforge.security.trust_chain import TrustChain, TamperDetectedError, SignatureStore
-from capforge.core.models import Capability, CapabilityStatus
-from capforge.verification.sandbox import SandboxRunner
-from capforge.verification.evaluator import CapabilityEvaluator
+import pytest
 
+from capforge.core.models import Capability, CapabilityStatus
+from capforge.security.adversarial_tester import AdversarialTester
+from capforge.security.code_guardian import CodeGuardian
+from capforge.security.trust_chain import TamperDetectedError, TrustChain
+from capforge.verification.evaluator import CapabilityEvaluator
+from capforge.verification.sandbox import SandboxRunner
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -517,6 +516,7 @@ def execute(inputs: dict) -> dict:
     def test_verify_is_constant_time_comparison(self):
         """Ensure HMAC comparison uses hmac.compare_digest (timing-safe)."""
         import inspect
+
         import capforge.security.trust_chain as tc_module
         source = inspect.getsource(tc_module.TrustChain.verify)
         assert "hmac.compare_digest" in source  # Must use timing-safe comparison
@@ -546,8 +546,9 @@ def execute(inputs: dict) -> dict:
             sandbox=SandboxRunner(use_subprocess=False),
             enable_security_gate=False,  # Skip L0 for this test
         )
-        from capforge.registry.store import CapabilityRegistry
         import tempfile
+
+        from capforge.registry.store import CapabilityRegistry
         reg = CapabilityRegistry(db_path=Path(tempfile.mkdtemp()) / "test.db")
         report = self.trust.promotion_gate(cap, evaluator, reg)
         assert report.approved, f"Expected approved but got: {report.reason}"
@@ -564,8 +565,9 @@ def execute(inputs: dict) -> dict:
             sandbox=SandboxRunner(use_subprocess=False),
             enable_security_gate=False,
         )
-        from capforge.registry.store import CapabilityRegistry
         import tempfile
+
+        from capforge.registry.store import CapabilityRegistry
         reg = CapabilityRegistry(db_path=Path(tempfile.mkdtemp()) / "test.db")
         report = self.trust.promotion_gate(cap, evaluator, reg)
         assert not report.approved
@@ -578,8 +580,9 @@ def execute(inputs: dict) -> dict:
             sandbox=SandboxRunner(use_subprocess=False),
             enable_security_gate=False,
         )
-        from capforge.registry.store import CapabilityRegistry
         import tempfile
+
+        from capforge.registry.store import CapabilityRegistry
         reg = CapabilityRegistry(db_path=Path(tempfile.mkdtemp()) / "test.db")
         self.trust.promotion_gate(cap, evaluator, reg)
         history = self.trust.get_promotion_history("promo_history")
@@ -599,7 +602,7 @@ def execute(inputs: dict) -> dict:
     def test_hmac_sig_not_exposed_via_get_signature(self):
         """get_signature() must NOT expose the HMAC value (only the hash)."""
         cap = self._cap("hmac_exposure_check")
-        sig = self.trust.sign(cap)
+        self.trust.sign(cap)
         public_info = self.trust.get_signature("hmac_exposure_check", "1.0.0")
         assert public_info is not None
         assert "hmac_sig" not in public_info
@@ -662,9 +665,9 @@ def execute(inputs):
         assert l0.get("skipped") is True or not l0.get("blocked")
 
     def test_trust_chain_blocks_tampered_code_in_executor(self, tmp_path):
-        from capforge.runtime.executor import CapabilityExecutor
-        from capforge.registry.store import CapabilityRegistry
         from capforge.core.models import ExecutionRequest
+        from capforge.registry.store import CapabilityRegistry
+        from capforge.runtime.executor import CapabilityExecutor
 
         db = tmp_path / "reg.db"
         trust_db = tmp_path / "trust.db"

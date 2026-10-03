@@ -6,13 +6,15 @@
 [![Version: 1.1.0](https://img.shields.io/badge/version-1.1.0-blue.svg)](versions.mdx)
 [![Python: 3.10 | 3.11 | 3.12](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Tests: 178/178 Passed](https://img.shields.io/badge/tests-178%2F178%20Passed%20(100%25)-brightgreen.svg)](tests/)
+[![Tests: 188/188 Passed](https://img.shields.io/badge/tests-188%2F188%20Passed%20(100%25)-brightgreen.svg)](tests/)
 [![Code Style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-red.svg)](https://docs.pydantic.dev/)
-[![MCP Native](https://img.shields.io/badge/MCP-JSON--RPC%202.0-purple.svg)](capforge/mcp/)
+[![Specification](https://img.shields.io/badge/docs-Canonical%20Specification-purple.svg)](docs/SPECIFICATION.md)
 
 > **"CapForge turns static AI agents into continuously evolving systems that can discover, acquire, construct, verify, reuse, evaluate, and safely improve their capabilities without retraining their underlying foundation model."**
+> 
+> Read the complete [Detailed Project Report & System Specification](docs/SPECIFICATION.md).
 
 ---
 

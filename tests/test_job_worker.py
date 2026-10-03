@@ -1,11 +1,12 @@
 """Tests for CapForge LearningJobWorker asynchronous daemon."""
 
+
 import pytest
-import time
+
 from capforge.acquisition.jobs import LearningJobManager
 from capforge.acquisition.worker import LearningJobWorker
-from capforge.runtime.agent_adapter import CapForgeAgent
 from capforge.registry.store import CapabilityRegistry
+from capforge.runtime.agent_adapter import CapForgeAgent
 
 
 @pytest.fixture

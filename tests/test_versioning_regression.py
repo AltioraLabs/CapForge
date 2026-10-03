@@ -2,15 +2,11 @@
 
 import tempfile
 from pathlib import Path
+
 import pytest
 
-from capforge.core.models import (
-    Capability,
-    CapabilityStatus,
-    TestCase,
-    TestType
-)
 from capforge.core.exceptions import RegressionDetectedError
+from capforge.core.models import Capability, CapabilityStatus, TestCase, TestType
 from capforge.registry.store import CapabilityRegistry
 from capforge.versioning.manager import VersionManager
 
@@ -75,8 +71,8 @@ def test_regression_blocks_breaking_version(temp_registry):
 
 def test_circuit_breaker_auto_rollback(temp_registry):
     """Verify that repeated runtime failures trip circuit breaker and roll back to parent version."""
-    from capforge.runtime.executor import CapabilityExecutor
     from capforge.core.models import ExecutionRequest
+    from capforge.runtime.executor import CapabilityExecutor
 
     # Stable v1
     v1 = Capability(

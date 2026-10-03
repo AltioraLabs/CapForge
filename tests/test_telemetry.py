@@ -1,8 +1,9 @@
 """Tests for CapForge OpenTelemetry Distributed Tracing (discussion.mdx §29, §50)."""
 
 import pytest
-from capforge.core.telemetry import trace_manager, TraceManager
+
 from capforge.core.models import Capability, CapabilityStatus, ExecutionRequest
+from capforge.core.telemetry import TraceManager, trace_manager
 from capforge.registry.store import CapabilityRegistry
 from capforge.runtime.executor import CapabilityExecutor
 

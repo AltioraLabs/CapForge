@@ -1,10 +1,12 @@
 """Tests for CapForge Model Context Protocol (MCP) Server."""
 
-import pytest
 import json
+
+import pytest
+
 from capforge.core.models import Capability, CapabilityStatus
-from capforge.registry.store import CapabilityRegistry
 from capforge.mcp.server import CapForgeMCPServer
+from capforge.registry.store import CapabilityRegistry
 
 
 @pytest.fixture

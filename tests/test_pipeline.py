@@ -1,6 +1,7 @@
 """Tests for CapForge Capability Composition Pipelines (discussion.mdx §20)."""
 
 import pytest
+
 from capforge.core.models import Capability, CapabilityStatus
 from capforge.registry.store import CapabilityRegistry
 from capforge.runtime.executor import CapabilityExecutor

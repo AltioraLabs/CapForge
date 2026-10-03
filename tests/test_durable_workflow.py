@@ -5,13 +5,13 @@ from fastapi.testclient import TestClient
 
 from capforge.core.models import Capability, CapabilityStatus, ParameterSpec
 from capforge.registry.store import CapabilityRegistry
-from capforge.runtime.executor import CapabilityExecutor
 from capforge.runtime.durable_workflow import (
     DurableWorkflowEngine,
     WorkflowDefinition,
     WorkflowStatus,
     WorkflowStep,
 )
+from capforge.runtime.executor import CapabilityExecutor
 from capforge.server.app import app
 
 

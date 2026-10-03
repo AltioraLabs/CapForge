@@ -1,9 +1,8 @@
 """Unit tests for LearningJobManager (§19, §38, §46)."""
 
-import pytest
 from capforge.acquisition.jobs import LearningJobManager
-from capforge.runtime.agent_adapter import CapForgeAgent
 from capforge.registry.store import CapabilityRegistry
+from capforge.runtime.agent_adapter import CapForgeAgent
 
 
 def test_learning_job_lifecycle():

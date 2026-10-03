@@ -1,11 +1,13 @@
 """Tests for Extended Multi-Framework Adapters & Docker Sandbox (v0.6.0)."""
 
-import pytest
 import json
+
+import pytest
+
+from capforge.adapter.crewai_adapter import CrewAIAgentAdapter
+from capforge.adapter.openai_adapter import OpenAIAgentAdapter
 from capforge.core.models import Capability, CapabilityStatus, ParameterSpec
 from capforge.registry.store import CapabilityRegistry
-from capforge.adapter.openai_adapter import OpenAIAgentAdapter
-from capforge.adapter.crewai_adapter import CrewAIAgentAdapter
 from capforge.verification.sandbox_docker import DockerSandboxRunner
 
 

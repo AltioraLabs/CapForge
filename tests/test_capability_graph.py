@@ -1,6 +1,5 @@
 """Unit tests for the Capability Graph and Impact Analysis."""
 
-import pytest
 from capforge.core.models import Capability, CapabilityDependency
 from capforge.discovery.capability_graph import CapabilityGraph
 

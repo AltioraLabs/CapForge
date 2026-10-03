@@ -1,12 +1,12 @@
 """Tests for CapForge Distributed Event Stream Broker (v0.7.0)."""
 
+
 import pytest
-from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from capforge.core.events import EventGateway
 from capforge.core.models import AgentEvent, EventType
-from capforge.events.broker import InMemoryStreamBroker, RedisStreamBroker, StreamMessage
+from capforge.events.broker import InMemoryStreamBroker, RedisStreamBroker
 from capforge.server.app import app
 
 

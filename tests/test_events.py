@@ -1,8 +1,7 @@
 """Unit tests for the Event Gateway and Experience Filter."""
 
-import pytest
-from capforge.core.models import AgentEvent, EventType
 from capforge.core.events import EventGateway, ExperienceFilter
+from capforge.core.models import AgentEvent, EventType
 
 
 class TestEventGateway:

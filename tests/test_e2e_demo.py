@@ -14,8 +14,8 @@ Lifecycle steps tested:
 8. GET /health and /health/ready → platform healthy
 """
 
-import pytest
 from fastapi.testclient import TestClient
+
 from capforge.server.app import app
 
 client = TestClient(app)

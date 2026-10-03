@@ -10,29 +10,24 @@ Tests that verify system resilience under failure conditions:
 """
 
 import time
-import pytest
 
+from capforge.core.events import EventGateway
+from capforge.core.governance import CapabilityFirewall, RiskEngine
 from capforge.core.models import (
     Capability,
     CapabilityStatus,
     ExecutionRequest,
-    TestCase,
-    TestType,
 )
-from capforge.core.governance import CapabilityFirewall, RiskEngine
 from capforge.registry.store import CapabilityRegistry
 from capforge.registry.vector_store import SemanticVectorIndex
-from capforge.runtime.executor import CapabilityExecutor
-from capforge.verification.sandbox import SandboxRunner
-from capforge.server.auth import AuthManager, AuthStore, UserRole
 from capforge.runtime.durable_workflow import (
     DurableWorkflowEngine,
     WorkflowDefinition,
-    WorkflowStep,
     WorkflowStatus,
+    WorkflowStep,
 )
-from capforge.core.events import EventGateway
-
+from capforge.runtime.executor import CapabilityExecutor
+from capforge.verification.sandbox import SandboxRunner
 
 # ---------------------------------------------------------------------------
 # 1. Sandbox Timeout — infinite loop must be killed

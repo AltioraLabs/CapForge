@@ -1,15 +1,15 @@
 """CapForge Enterprise General Availability (v1.0.0 GA) Integration & Test Suite."""
 
 import pytest
-from typer.testing import CliRunner
 from fastapi.testclient import TestClient
+from typer.testing import CliRunner
 
 from capforge.cli import app as cli_app
 from capforge.core.models import Capability, CapabilityStatus, ParameterSpec
 from capforge.registry.store import CapabilityRegistry
 from capforge.registry.vector_store import DenseVectorEmbeddingEngine, SemanticVectorIndex
-from capforge.server.auth import APIKeyRecord, AuthManager, UserRole
 from capforge.server.app import app
+from capforge.server.auth import AuthManager, UserRole
 
 
 @pytest.fixture

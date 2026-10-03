@@ -20,13 +20,15 @@ logger = logging.getLogger("capforge.events")
 class EventGateway:
     """Receives, normalises, and dispatches agent events to registered handlers and stream brokers."""
 
-    def __init__(self, broker: Any | None = None) -> None:
+    def __init__(self, broker: Any | None = None, privacy_filter: Any | None = None) -> None:
         from capforge.events.broker import InMemoryStreamBroker
+        from capforge.security.privacy_filter import privacy_filter as default_privacy_filter
 
         self._handlers: dict[EventType, list[Callable[[AgentEvent], None]]] = defaultdict(list)
         self._event_log: list[AgentEvent] = []
         self._max_log_size: int = 10_000
         self.broker = broker if broker is not None else InMemoryStreamBroker()
+        self.privacy_filter = privacy_filter if privacy_filter is not None else default_privacy_filter
 
     def subscribe(self, event_type: EventType, handler: Callable[[AgentEvent], None]) -> None:
         """Register a handler for a specific event type."""
@@ -39,6 +41,10 @@ class EventGateway:
 
     def emit(self, event: AgentEvent) -> None:
         """Emit an event through the gateway to all subscribed handlers and the stream broker."""
+        # Sanitize event using trace privacy filter to prevent secret/PII leakage
+        if self.privacy_filter is not None:
+            event = self.privacy_filter.sanitize_event(event)
+
         # Store in log
         self._event_log.append(event)
         if len(self._event_log) > self._max_log_size:

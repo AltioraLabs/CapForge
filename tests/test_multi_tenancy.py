@@ -1,8 +1,9 @@
 """Tests for CapForge Multi-Tenant Namespace Isolation (v0.5.0)."""
 
 import pytest
-from capforge.core.models import Capability, CapabilityStatus, ExecutionRequest
+
 from capforge.core.governance import CapabilityFirewall
+from capforge.core.models import Capability, CapabilityStatus, ExecutionRequest
 from capforge.registry.store import CapabilityRegistry
 
 

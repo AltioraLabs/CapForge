@@ -1,6 +1,12 @@
 """Unit tests for YAML Capability Manifest Serialization and Deserialization (§12)."""
 
 import pytest
+
+from capforge.core.manifest import (
+    capability_to_manifest_dict,
+    capability_to_yaml,
+    manifest_yaml_to_capability,
+)
 from capforge.core.models import (
     Capability,
     CapabilityStatus,
@@ -10,12 +16,6 @@ from capforge.core.models import (
     TestType,
     ToolPermissions,
     ToolRequirement,
-)
-from capforge.core.manifest import (
-    capability_to_manifest_dict,
-    capability_to_yaml,
-    manifest_dict_to_capability,
-    manifest_yaml_to_capability,
 )
 
 

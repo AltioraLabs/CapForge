@@ -2,16 +2,12 @@
 
 import tempfile
 from pathlib import Path
+
 import pytest
 
 from capforge.core.models import (
     Capability,
     CapabilityStatus,
-    ExecutionMode,
-    ParameterSpec,
-    TestCase,
-    TestType,
-    VerificationResult
 )
 from capforge.registry.store import CapabilityRegistry
 

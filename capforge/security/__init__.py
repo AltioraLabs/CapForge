@@ -28,6 +28,8 @@ _LAZY = {
     "TamperDetectedError": "capforge.security.trust_chain",
     "PromotionBlockedError": "capforge.security.trust_chain",
     "get_trust_chain": "capforge.security.trust_chain",
+    "TracePrivacyFilter": "capforge.security.privacy_filter",
+    "privacy_filter": "capforge.security.privacy_filter",
 }
 
 

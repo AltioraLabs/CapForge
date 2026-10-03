@@ -2,11 +2,12 @@
 
 import tempfile
 from pathlib import Path
+
 import pytest
 
 from capforge.core.models import Capability, CapabilityStatus
-from capforge.registry.store import CapabilityRegistry
 from capforge.discovery.gap_detector import CapabilityGapDetector
+from capforge.registry.store import CapabilityRegistry
 
 
 @pytest.fixture
