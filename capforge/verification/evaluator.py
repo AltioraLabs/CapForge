@@ -241,9 +241,9 @@ class CapabilityEvaluator:
             )
 
             passed = False
-            error_msg = run_res["error"]
-            tb = run_res["traceback"]
-            output = run_res["output"]
+            error_msg = run_res.get("error")
+            tb = run_res.get("traceback")
+            output = run_res.get("output")
 
             if run_res["success"]:
                 passed, assert_err = self._check_assertions(output, test)
@@ -265,7 +265,7 @@ class CapabilityEvaluator:
                     test_id=test.id,
                     test_type=test.test_type,
                     passed=passed,
-                    execution_time_ms=run_res["execution_time_ms"],
+                    execution_time_ms=run_res.get("execution_time_ms", 0.0),
                     output=output,
                     error_message=error_msg,
                     traceback=tb,
@@ -293,8 +293,8 @@ class CapabilityEvaluator:
                     timeout_sec=reg_test.max_timeout_sec,
                 )
                 r_passed = False
-                if reg_res["success"]:
-                    r_passed, _ = self._check_assertions(reg_res["output"], reg_test)
+                if reg_res.get("success"):
+                    r_passed, _ = self._check_assertions(reg_res.get("output"), reg_test)
                 if not r_passed:
                     regression_passed = False
                     regression_failed_tests.append(reg_test.id)

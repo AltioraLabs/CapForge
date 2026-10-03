@@ -87,6 +87,7 @@ class DockerSandboxRunner(SandboxRunner):
                         "result": None,
                         "output": None,
                         "error": "Entrypoint function '{entrypoint}' not found or not callable",
+                        "traceback": None,
                     }}))
                     sys.exit(0)
 
@@ -101,6 +102,7 @@ class DockerSandboxRunner(SandboxRunner):
                     "result": result,
                     "output": result,
                     "error": None,
+                    "traceback": None,
                 }}, default=str))
             except Exception as e:
                 print(json.dumps({{
@@ -133,11 +135,17 @@ class DockerSandboxRunner(SandboxRunner):
         start = time.perf_counter()
         runner_script = self._build_runner_script(code_body, entrypoint, inputs)
 
+        env_args: list[str] = []
+        if env_overrides:
+            for k, v in env_overrides.items():
+                env_args.extend(["-e", f"{k}={v}"])
+
         docker_cmd = [
             "docker",
             "run",
             "--rm",
             "-i",
+            *env_args,
             f"--memory={self.memory_limit}",
             f"--cpus={self.cpu_quota}",
             "--pids-limit=64",
@@ -167,6 +175,7 @@ class DockerSandboxRunner(SandboxRunner):
                     "success": False,
                     "output": None,
                     "error": proc.stderr.strip() or f"Process failed with exit code {proc.returncode}",
+                    "traceback": proc.stderr.strip() or None,
                     "execution_time_ms": round(elapsed, 2),
                 }
 
@@ -176,6 +185,7 @@ class DockerSandboxRunner(SandboxRunner):
                     "success": False,
                     "output": None,
                     "error": "No output produced from container execution",
+                    "traceback": None,
                     "execution_time_ms": round(elapsed, 2),
                 }
 
@@ -184,6 +194,7 @@ class DockerSandboxRunner(SandboxRunner):
                 "success": data.get("status") == "SUCCESS" or data.get("success") is True,
                 "output": data.get("result") if "result" in data else data.get("output"),
                 "error": data.get("error"),
+                "traceback": data.get("traceback"),
                 "execution_time_ms": round(elapsed, 2),
             }
 
@@ -193,6 +204,7 @@ class DockerSandboxRunner(SandboxRunner):
                 "success": False,
                 "output": None,
                 "error": f"Container execution timed out after {timeout}s",
+                "traceback": None,
                 "execution_time_ms": round(elapsed, 2),
             }
         except Exception as e:

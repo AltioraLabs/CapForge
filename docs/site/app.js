@@ -204,16 +204,23 @@
   
   // Quick copy buttons with data-copy-text
   document.querySelectorAll('[data-copy-text]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
       const text = btn.dataset.copyText;
+      const targetIconBtn = btn.classList.contains('hero-install-box')
+        ? btn.querySelector('.hero-copy-btn')
+        : btn;
       try {
         await navigator.clipboard.writeText(text);
-        btn.classList.add('copied');
-        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
-        setTimeout(() => {
-          btn.classList.remove('copied');
-          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-        }, 1800);
+        if (targetIconBtn) {
+          targetIconBtn.classList.add('copied');
+          const originalHtml = targetIconBtn.innerHTML;
+          targetIconBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+          setTimeout(() => {
+            targetIconBtn.classList.remove('copied');
+            targetIconBtn.innerHTML = originalHtml;
+          }, 1800);
+        }
       } catch (err) {}
     });
   });
