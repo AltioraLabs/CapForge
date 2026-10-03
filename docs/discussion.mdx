@@ -1,0 +1,2723 @@
+Absolutely. I’ve consolidated all of the previous decisions into **one canonical CapForge specification** and removed the overlaps/inconsistencies between the earlier versions.
+
+This should now be treated as the **baseline system specification** before we move into detailed API/schema/implementation design.
+
+# CapForge — Canonical System Specification
+
+## 1. Project Identity
+
+### Name
+
+**CapForge**
+
+### Full name
+
+> **CapForge — Framework-Agnostic Capability Acquisition, Verification, and Evolution Platform for AI Agents**
+
+### One-line pitch
+
+> **CapForge turns static AI agents into continuously evolving systems that can acquire, verify, reuse, and safely improve their capabilities.**
+
+### Core idea
+
+CapForge is **not another agent framework**.
+
+It is a **capability evolution layer** that sits alongside existing agentic systems and allows them to acquire new capabilities without retraining their underlying foundation model.
+
+```text
+Existing Agent
+      +
+  CapForge
+      ↓
+Continuously Evolving Agent
+```
+
+---
+
+# 2. The Fundamental Problem
+
+Today's agentic systems can generally:
+
+```text
+Reason
+Plan
+Call tools
+Use memory
+Delegate to other agents
+Use MCP
+Perform workflows
+```
+
+But their capabilities are largely determined by what is available to them at deployment time.
+
+When they encounter something unfamiliar:
+
+```text
+Agent
+  ↓
+New task
+  ↓
+Capability missing
+  ↓
+Failure / repeated trial-and-error
+  ↓
+Task ends
+```
+
+The experience is often not converted into a **verified, reusable capability**.
+
+CapForge changes this:
+
+```text
+Agent
+  ↓
+Capability gap
+  ↓
+Learn / acquire
+  ↓
+Construct capability
+  ↓
+Verify
+  ↓
+Register
+  ↓
+Reuse
+  ↓
+Improve
+```
+
+---
+
+# 3. Core Research Question
+
+The central research question is:
+
+> **Can an existing AI agentic system continuously expand its verified capability set by converting valuable experiences and capability gaps into reusable skills and tools while maintaining reliability, backward compatibility, and safety?**
+
+The engineering question is:
+
+> **Can this capability-evolution mechanism operate independently of the underlying agent framework?**
+
+---
+
+# 4. What CapForge Is — and Is Not
+
+## CapForge IS
+
+* Capability acquisition infrastructure
+* Skill lifecycle management
+* Tool evolution infrastructure
+* Capability discovery
+* Skill/workflow synthesis
+* Verification
+* Regression protection
+* Version management
+* Capability routing
+* Governance
+* Capability provenance
+* Cross-framework integration
+* Continuous capability evolution
+
+## CapForge IS NOT
+
+```text
+Not a foundation model
+Not an LLM
+Not a replacement for LangGraph
+Not a replacement for OpenAI Agents SDK
+Not a replacement for CrewAI
+Not a replacement for AutoGen
+Not a memory system
+Not merely a vector database
+Not merely a skill marketplace
+Not simply a reflection loop
+Not simply a prompt optimizer
+```
+
+The underlying agent remains responsible for:
+
+> **Reasoning + planning + task execution**
+
+CapForge becomes responsible for:
+
+> **Capability discovery + acquisition + verification + management + evolution**
+
+---
+
+# 5. Canonical Architecture
+
+I would formally define CapForge as having **three logical planes**.
+
+## Plane 1 — Execution Plane
+
+This is the existing agentic ecosystem.
+
+Examples:
+
+```text
+LangGraph
+OpenAI Agents SDK
+CrewAI
+AutoGen
+Microsoft Agent Framework
+Custom agent runtimes
+MCP-based agents
+A2A agent systems
+```
+
+It contains:
+
+```text
+Agent
+Planner
+Reasoner
+Memory
+Handoffs
+Tools
+MCP
+A2A
+Existing workflows
+```
+
+---
+
+## Plane 2 — Capability Control Plane
+
+This is the **production-facing portion of CapForge**.
+
+It handles:
+
+```text
+Capability discovery
+Capability retrieval
+Capability routing
+Capability composition
+Capability registry
+Capability permissions
+Capability versions
+Capability governance
+Runtime monitoring
+```
+
+---
+
+## Plane 3 — Learning & Verification Plane
+
+This is the **asynchronous experimental portion of CapForge**.
+
+It handles:
+
+```text
+Experience analysis
+Capability-gap learning
+Knowledge acquisition
+Tool discovery
+Skill synthesis
+Tool synthesis
+Test generation
+Sandbox execution
+Evaluation
+Generalization
+Regression testing
+Risk assessment
+Approval
+Promotion
+Rollback
+```
+
+The important architectural rule is:
+
+> **Production execution and capability learning must be separated.**
+
+---
+
+# 6. Canonical Architecture Diagram
+
+```text
+                              USER / APPLICATION
+                                      │
+                                      ▼
+╔══════════════════════════════════════════════════════════════════════════╗
+║                         EXECUTION PLANE                                ║
+║                                                                        ║
+║   ┌───────────────┐       ┌──────────────────┐       ┌──────────────┐ ║
+║   │ Planner /     │──────▶│ Existing Agent   │──────▶│ Tools / MCP  │ ║
+║   │ Reasoner      │       │ Runtime          │       │ APIs / DB    │ ║
+║   └───────────────┘       └────────┬─────────┘       └──────────────┘ ║
+║                                    │                                   ║
+║                    Memory / Handoffs / Multi-Agent                    ║
+║                                                                        ║
+╚════════════════════════════════════╪═══════════════════════════════════╝
+                                     │
+                              Adapter / SDK
+                                     │
+                                     ▼
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    CAPFORGE — CAPABILITY CONTROL PLANE               ║
+║                                                                          ║
+║  ┌────────────────┐       ┌──────────────────┐       ┌───────────────┐ ║
+║  │ Event & Trace  │──────▶│ Capability       │──────▶│ Capability    │ ║
+║  │ Gateway        │       │ Analyzer         │       │ Router        │ ║
+║  └────────────────┘       └────────┬─────────┘       └───────┬───────┘ ║
+║                                    │                         │         ║
+║                                    ▼                         ▼         ║
+║                           ┌────────────────┐       ┌────────────────┐ ║
+║                           │ Gap Detector   │       │ Capability     │ ║
+║                           └───────┬────────┘       │ Registry       │ ║
+║                                   │                └────────────────┘ ║
+║                                   ▼                                   ║
+║                           Experience / Learning Queue                 ║
+╚═══════════════════════════════════╪════════════════════════════════════╝
+                                    │
+                              ASYNCHRONOUS
+                                    │
+                                    ▼
+╔══════════════════════════════════════════════════════════════════════════╗
+║                  LEARNING & VERIFICATION PLANE                          ║
+║                                                                          ║
+║ Experience Filter                                                       ║
+║        ↓                                                                 ║
+║ Acquisition Engine                                                       ║
+║        ↓                                                                 ║
+║ Knowledge / Evidence Engine                                              ║
+║        ↓                                                                 ║
+║ Skill + Tool Synthesizer                                                 ║
+║        ↓                                                                 ║
+║ Test Generator                                                           ║
+║        ↓                                                                 ║
+║ Isolated Sandbox                                                         ║
+║        ↓                                                                 ║
+║ Structural Evaluation                                                    ║
+║        ↓                                                                 ║
+║ Functional Evaluation                                                   ║
+║        ↓                                                                 ║
+║ Generalization Evaluation                                                ║
+║        ↓                                                                 ║
+║ Regression Evaluation                                                    ║
+║        ↓                                                                 ║
+║ Security / Risk Evaluation                                               ║
+║        ↓                                                                 ║
+║ Governance / Approval                                                    ║
+║        ↓                                                                 ║
+║ Version Manager                                                          ║
+║        ↓                                                                 ║
+║ Capability Registry                                                      ║
+╚═══════════════════════════════════╪════════════════════════════════════╝
+                                    │
+                             VERIFIED CAPABILITY
+                                    │
+                                    ▼
+                            EXISTING AGENT
+```
+
+---
+
+# 7. Framework-Agnostic Integration
+
+The most important architectural decision is:
+
+> **CapForge Core must never depend directly on a specific agent framework.**
+
+Instead:
+
+```text
+                     CapForge Core
+                           │
+                    Adapter Interface
+                           │
+          ┌────────────────┼─────────────────┐
+          │                │                 │
+          ▼                ▼                 ▼
+     LangGraph          OpenAI             MCP
+      Adapter          SDK Adapter        Adapter
+          │                │                 │
+          └────────────────┼─────────────────┘
+                           │
+                     Normalized Events
+```
+
+Additional adapters:
+
+```text
+CrewAI Adapter
+AutoGen Adapter
+Microsoft Agent Framework Adapter
+Custom Agent Adapter
+A2A Adapter
+```
+
+---
+
+# 8. Four Integration Interfaces
+
+CapForge should eventually expose four major interfaces.
+
+## Interface 1 — Runtime Event API
+
+For:
+
+```text
+LangGraph
+OpenAI Agents
+Custom agents
+CrewAI
+AutoGen
+```
+
+Purpose:
+
+```text
+Agent → CapForge
+```
+
+---
+
+## Interface 2 — MCP
+
+For:
+
+```text
+Tool discovery
+Tool execution
+Tool validation
+Capability exposure
+```
+
+CapForge should both:
+
+```text
+Consume MCP tools
+```
+
+and:
+
+```text
+Expose verified capabilities through MCP
+```
+
+---
+
+## Interface 3 — A2A
+
+For:
+
+```text
+Agent ↔ Agent
+```
+
+Eventually CapForge itself can operate as a capability provider.
+
+```text
+Agent A
+   │
+   │ A2A
+   ▼
+CapForge
+   │
+   ├── discover capability
+   ├── acquire capability
+   ├── verify capability
+   └── provide capability
+```
+
+---
+
+## Interface 4 — CapForge Adapter SDK
+
+For deep integrations.
+
+A framework adapter should expose concepts such as:
+
+```python
+discover_agents()
+discover_tools()
+capture_events()
+extract_task()
+extract_tool_call()
+extract_failure()
+invoke_skill()
+inject_capability()
+```
+
+The exact API can be finalized during implementation.
+
+---
+
+# 9. Universal Event Model
+
+Framework-specific events need to be normalized.
+
+For example:
+
+```json
+{
+  "event": "tool_failed",
+  "run_id": "run_8472",
+  "task_id": "task_2381",
+  "agent_id": "agent_security",
+  "framework": "langgraph",
+
+  "tool": {
+    "name": "github.get_repository",
+    "version": "2.1"
+  },
+
+  "input": {
+    "repository": "example/repo"
+  },
+
+  "output": null,
+
+  "error": {
+    "type": "AUTHENTICATION_ERROR",
+    "message": "Token expired"
+  },
+
+  "timestamp": "2026-10-03T18:22:31Z"
+}
+```
+
+Standard event types should eventually include:
+
+```text
+agent_started
+agent_finished
+
+task_started
+task_completed
+task_failed
+
+tool_called
+tool_succeeded
+tool_failed
+
+skill_selected
+skill_started
+skill_completed
+skill_failed
+
+handoff_started
+handoff_completed
+
+capability_gap_detected
+
+learning_started
+learning_completed
+
+skill_candidate_created
+skill_evaluated
+skill_promoted
+skill_rejected
+skill_rollback
+```
+
+---
+
+# 10. Capability Ontology
+
+This is one of the most important formal definitions.
+
+CapForge should distinguish:
+
+```text
+CAPABILITY
+│
+├── TOOL
+│
+├── SKILL
+│
+├── WORKFLOW
+│
+├── COMPOSITION
+│
+└── EVALUATOR
+```
+
+---
+
+## Tool
+
+A primitive callable operation.
+
+Examples:
+
+```text
+github.get_repository()
+browser.search()
+database.query()
+python.execute()
+filesystem.read()
+```
+
+---
+
+## Skill
+
+A reusable procedure that may use multiple tools.
+
+Example:
+
+```text
+github.security_analysis
+```
+
+Internally:
+
+```text
+github.security_analysis
+       │
+       ├── get_repository()
+       ├── inspect_dependencies()
+       ├── scan_source()
+       ├── identify_vulnerabilities()
+       └── generate_report()
+```
+
+---
+
+## Workflow
+
+A larger structured sequence.
+
+```text
+incident_response_workflow
+```
+
+could contain:
+
+```text
+detect
+→ investigate
+→ classify
+→ remediate
+→ validate
+→ report
+```
+
+---
+
+## Composition
+
+Existing capabilities combined to create a new capability.
+
+```text
+repository_analysis
++
+dependency_analysis
++
+vulnerability_analysis
+=
+security_audit
+```
+
+---
+
+# 11. Skill Is NOT Just a Prompt
+
+A CapForge skill is a structured capability package.
+
+```text
+Skill
+│
+├── Identity
+├── Description
+├── Inputs
+├── Outputs
+├── Procedure
+├── Tools
+├── Dependencies
+├── Preconditions
+├── Postconditions
+├── Failure Modes
+├── Test Suite
+├── Evaluators
+├── Permissions
+├── Risk Level
+├── Provenance
+├── Version
+├── Evaluation Results
+└── Regression Results
+```
+
+Its implementation may contain:
+
+```text
+Prompt
++
+Tool sequence
++
+Code
++
+Workflow
++
+Sub-agent
++
+Existing skills
+```
+
+---
+
+# 12. Capability Manifest
+
+Every capability should have a machine-readable manifest.
+
+Example:
+
+```yaml
+capability_id: github.security_analysis
+
+version: 3.1.0
+
+type: skill
+
+description:
+  Analyze a repository for security vulnerabilities.
+
+inputs:
+  repository:
+    type: string
+
+outputs:
+  report:
+    type: SecurityReport
+
+procedure:
+  type: workflow
+
+tools:
+  - github.get_repository
+  - filesystem.read
+  - dependency_scanner
+  - python.execute
+
+dependencies:
+  - repository_access
+  - source_analysis
+
+preconditions:
+  - repository_accessible
+
+postconditions:
+  - security_report_generated
+
+failure_modes:
+  - authentication_failure
+  - network_failure
+  - malformed_repository
+
+evaluator:
+  - security_analysis_eval_v4
+
+permissions:
+  filesystem: read
+  network: restricted
+  github: read
+
+risk:
+  level: medium
+
+confidence: 0.94
+
+status: production
+
+parent_version: 3.0.0
+
+provenance:
+  sources: []
+
+evaluation:
+  functional: {}
+  generalization: {}
+  security: {}
+
+regression:
+  suite: {}
+```
+
+This manifest becomes one of the **core contracts of CapForge**.
+
+---
+
+# 13. Tool Evolution
+
+CapForge is allowed to:
+
+* discover tools
+* reuse tools
+* wrap tools
+* compose tools
+* create tools
+* modify tools
+* version tools
+* deprecate tools
+
+But tool evolution is more restricted than ordinary skill evolution.
+
+## Tool lifecycle
+
+```text
+Capability Gap
+      ↓
+Tool Discovery
+      ↓
+Existing Tool?
+   ↙        ↘
+ YES        NO
+  ↓          ↓
+Reuse      Synthesize
+             ↓
+       Security Analysis
+             ↓
+           Sandbox
+             ↓
+        Contract Tests
+             ↓
+       Integration Tests
+             ↓
+       Permission Analysis
+             ↓
+       Risk Classification
+             ↓
+       Human Approval?
+             ↓
+        Tool Registry
+```
+
+A generated tool must **never receive production privileges merely because it passes functional tests**.
+
+---
+
+# 14. Knowledge Acquisition
+
+CapForge can learn from:
+
+```text
+Web
+GitHub
+Official documentation
+Internal documentation
+Existing tools
+MCP servers
+Existing skills
+Agent experiences
+Task traces
+Previous evaluations
+Potentially other approved knowledge sources
+```
+
+Architecture:
+
+```text
+                 Acquisition Engine
+                        │
+        ┌───────────────┼────────────────┐
+        ▼               ▼                ▼
+       Web            GitHub          Documentation
+        │               │                │
+        └───────────────┼────────────────┘
+                        ▼
+                Knowledge Extractor
+                        │
+                        ▼
+                  Evidence Store
+                        │
+                        ▼
+              Capability Hypothesis
+                        │
+                        ▼
+                 Skill / Tool
+```
+
+---
+
+# 15. Evidence → Capability
+
+We should never have:
+
+```text
+Web
+ ↓
+LLM
+ ↓
+Production Skill
+```
+
+Instead:
+
+```text
+External Source
+      ↓
+Evidence
+      ↓
+Knowledge Extraction
+      ↓
+Capability Hypothesis
+      ↓
+Candidate Capability
+      ↓
+Verification
+      ↓
+Production Capability
+```
+
+Every acquired capability should preserve:
+
+```text
+source
+source type
+source URL/reference
+retrieval time
+content hash
+evidence
+license information where relevant
+trust level
+extraction process
+capability generated from source
+```
+
+This provides **provenance and auditability**.
+
+---
+
+# 16. Experience Engine
+
+CapForge must not learn from every event.
+
+The Experience Engine determines whether an experience is worth learning from.
+
+### Ignore
+
+```text
+Routine success
+Duplicate experience
+Trivial failure
+Known failure
+Low-value variation
+```
+
+### Learn
+
+```text
+Novel failure
+Repeated failure
+Capability gap
+Unexpected successful strategy
+High-value recovery
+New tool discovery
+Repeatedly useful procedure
+Transferable solution
+```
+
+Flow:
+
+```text
+Agent Event
+     ↓
+Experience Filter
+     ↓
+Valuable?
+  ↙     ↘
+ NO     YES
+ ↓       ↓
+Ignore  Learning Queue
+```
+
+---
+
+# 17. Capability Gap Detection
+
+This is a central CapForge component.
+
+Example:
+
+> "Analyze this unfamiliar GitHub repository for security vulnerabilities."
+
+Analyzer determines:
+
+```text
+Required capabilities:
+
+repository_access
+source_code_analysis
+dependency_analysis
+vulnerability_detection
+security_report_generation
+```
+
+Registry:
+
+```text
+repository_access       → AVAILABLE
+source_code_analysis    → AVAILABLE
+dependency_analysis    → AVAILABLE
+vulnerability_detection → MISSING
+security_reporting      → AVAILABLE
+```
+
+Therefore:
+
+```text
+CAPABILITY GAP
+
+vulnerability_detection
+```
+
+is sent to the learning system.
+
+---
+
+# 18. Runtime Capability Routing
+
+When the capability already exists:
+
+```text
+Task
+ ↓
+Capability Analyzer
+ ↓
+Required Capability
+ ↓
+Capability Router
+```
+
+Router searches:
+
+```text
+1. Exact capability
+2. Compatible capability
+3. Semantic match
+4. Composable capabilities
+5. Capability Graph
+```
+
+Example:
+
+```text
+Need:
+npm vulnerability analysis
+```
+
+Could select:
+
+```text
+npm_security_analysis
+```
+
+or compose:
+
+```text
+dependency_analysis
++
+vulnerability_database
++
+security_report
+```
+
+---
+
+# 19. Learning Runtime
+
+The production agent should **not learn synchronously**.
+
+Correct architecture:
+
+```text
+Production Agent
+       │
+       ▼
+Capability Gap
+       │
+       ▼
+Learning Queue
+       │
+       ▼
+Learning Runtime
+       │
+       ▼
+Candidate Capability
+       │
+       ▼
+Sandbox
+       │
+       ▼
+Evaluation
+       │
+       ▼
+Regression
+       │
+       ▼
+Policy Gate
+       │
+       ▼
+Promotion
+       │
+       ▼
+Production Registry
+```
+
+This means a failed learning attempt cannot directly corrupt production.
+
+---
+
+# 20. Skill Acquisition Pipeline
+
+The complete learning process:
+
+```text
+DISCOVER
+   ↓
+UNDERSTAND
+   ↓
+PLAN
+   ↓
+ACQUIRE
+   ↓
+CONSTRUCT
+   ↓
+SANDBOX
+   ↓
+VERIFY
+   ↓
+GENERALIZE
+   ↓
+REGRESSION TEST
+   ↓
+RISK ASSESS
+   ↓
+APPROVE
+   ↓
+VERSION
+   ↓
+PROMOTE
+   ↓
+DEPLOY
+   ↓
+MONITOR
+   ↓
+RE-EVALUATE
+   ↓
+EVOLVE
+   ↓
+ROLLBACK / RETIRE
+```
+
+This is the **CapForge capability lifecycle**.
+
+---
+
+# 21. Candidate Skill Construction
+
+Suppose CapForge needs:
+
+```text
+github.security_analysis
+```
+
+The Synthesizer generates:
+
+```yaml
+skill:
+  id: github.security_analysis
+  version: 1.0.0
+
+  tools:
+    - github.get_repository
+    - filesystem.read
+    - dependency_scanner
+    - python.execute
+
+  dependencies:
+    - repository_access
+    - source_analysis
+
+  permissions:
+    filesystem: read
+    github: read
+    network: restricted
+
+  evaluator:
+    security_analysis_eval_v1
+
+  risk:
+    medium
+```
+
+This is a **candidate**, not production capability.
+
+---
+
+# 22. Sandbox
+
+Every new or modified capability enters an isolated environment.
+
+```text
+             Candidate Capability
+                      │
+                      ▼
+              ┌─────────────────┐
+              │ Docker Sandbox  │
+              │                 │
+              │ Restricted FS   │
+              │ Restricted Net │
+              │ CPU limits      │
+              │ Memory limits   │
+              │ Timeout         │
+              │ Temp credentials│
+              └────────┬────────┘
+                       │
+                       ▼
+                   Test Runner
+```
+
+The sandbox should prevent:
+
+```text
+Unauthorized network access
+Production filesystem access
+Credential leakage
+Uncontrolled processes
+Resource exhaustion
+Production database access
+Unauthorized side effects
+```
+
+---
+
+# 23. Automatic Test Generation
+
+CapForge should generate tests for a candidate capability.
+
+Example:
+
+```text
+Candidate:
+github.security_analysis
+```
+
+Generated tests:
+
+```text
+T1 — Valid repository
+
+T2 — Empty repository
+
+T3 — Large repository
+
+T4 — Vulnerable dependency
+
+T5 — Private repository
+
+T6 — Invalid repository
+
+T7 — Authentication failure
+
+T8 — Network failure
+
+T9 — Malformed source
+
+T10 — Unexpected dependency format
+```
+
+The test generator should also create **unseen/generalization cases**, not only happy-path tests.
+
+---
+
+# 24. Four-Level Evaluation
+
+A capability isn't "verified" just because it runs once.
+
+## Level 1 — Structural Validation
+
+```text
+Schema valid?
+Dependencies valid?
+Tools available?
+Inputs valid?
+Outputs valid?
+Permissions valid?
+Manifest valid?
+```
+
+---
+
+## Level 2 — Functional Evaluation
+
+```text
+Known task
+    ↓
+Expected outcome
+    ↓
+Actual outcome
+```
+
+Measures:
+
+```text
+Correctness
+Task success
+Output quality
+Tool execution success
+```
+
+---
+
+## Level 3 — Generalization Evaluation
+
+```text
+Known examples
+      ↓
+Candidate Skill
+      ↓
+Unseen tasks
+      ↓
+Measure transfer
+```
+
+This prevents simple memorization.
+
+---
+
+## Level 4 — Regression Evaluation
+
+Suppose:
+
+```text
+Skill v1
+
+Security analysis       82%
+Dependency analysis     91%
+Repository analysis     95%
+```
+
+CapForge generates v2:
+
+```text
+Security analysis       91%
+Dependency analysis     63%
+Repository analysis     94%
+```
+
+Although security improved:
+
+```text
+Dependency analysis
+91% → 63%
+```
+
+means:
+
+```text
+REGRESSION
+```
+
+Therefore:
+
+```text
+v2 → REJECT
+Production → v1
+```
+
+---
+
+# 25. Promotion Pipeline
+
+Canonical promotion:
+
+```text
+Candidate
+   ↓
+Structural Validation
+   ↓
+Functional Evaluation
+   ↓
+Generalization Evaluation
+   ↓
+Regression Evaluation
+   ↓
+Security Evaluation
+   ↓
+Risk Assessment
+   ↓
+Governance
+   ↓
+Version
+   ↓
+Promotion
+```
+
+---
+
+# 26. Risk Engine
+
+Promotion depends on risk.
+
+```text
+Candidate
+    ↓
+Risk Engine
+    │
+    ├─────────────┬─────────────┐
+    ▼             ▼             ▼
+   LOW          MEDIUM         HIGH
+    │             │             │
+    ▼             ▼             ▼
+  Auto          Extended       Human
+ Promote         Tests        Approval
+```
+
+Risk considers:
+
+```text
+Tool permissions
+Data sensitivity
+Network access
+Filesystem access
+Write operations
+External side effects
+Production access
+Financial impact
+User impact
+Dependency trust
+Source provenance
+```
+
+Example:
+
+```text
+Summarize documentation
+→ LOW
+
+Read public GitHub repository
+→ LOW
+
+Modify local code
+→ MEDIUM
+
+Create GitHub PR
+→ MEDIUM/HIGH
+
+Deploy production service
+→ HIGH
+
+Delete production data
+→ HIGH
+```
+
+Organizations should be able to customize these policies.
+
+---
+
+# 27. Capability Firewall
+
+At runtime:
+
+```text
+Agent
+ ↓
+Capability Router
+ ↓
+Capability Firewall
+ ↓
+Verified Capability
+ ↓
+Tool Execution
+```
+
+The firewall verifies:
+
+```text
+Who requested it?
+Which agent?
+Which capability?
+Which version?
+Which tools?
+Which data?
+Which permissions?
+Which environment?
+What risk?
+```
+
+This becomes the runtime security boundary between the agent and learned capabilities.
+
+---
+
+# 28. Governance
+
+Governance is cross-cutting.
+
+```text
+                  GOVERNANCE
+                      │
+       ┌──────────────┼──────────────┐
+       ▼              ▼              ▼
+  Permissions        Risk       Human Approval
+       │              │              │
+       ├── Tools      ├── Low        ├── Required
+       ├── Data       ├── Medium     └── Optional
+       ├── Network    └── High
+       └── Writes
+```
+
+---
+
+# 29. Critical Security Principle
+
+CapForge itself must **not autonomously modify its own governance controls**.
+
+CapForge may evolve:
+
+```text
+Skills
+Tools
+Workflows
+Compositions
+Evaluators
+```
+
+But should not autonomously modify:
+
+```text
+Authentication
+Authorization
+Governance policies
+Audit system
+Security controls
+Promotion rules
+Platform isolation
+```
+
+Otherwise:
+
+```text
+Agent
+ ↓
+CapForge
+ ↓
+CapForge modifies itself
+ ↓
+Security restrictions removed
+```
+
+Therefore:
+
+> **CapForge may autonomously expand what an agent can do, but it cannot autonomously redefine the rules governing what it is allowed to do.**
+
+This should be a fundamental security invariant.
+
+---
+
+# 30. Capability Registry
+
+The Capability Registry is effectively:
+
+> **Git + package manager + model registry + capability database**
+
+combined for agent capabilities.
+
+Example:
+
+```text
+Capability Registry
+│
+├── github.security_analysis
+│   ├── v1
+│   ├── v2
+│   └── v3
+│
+├── github.issue_analysis
+│   ├── v1
+│   └── v2
+│
+├── dependency_analysis
+│   └── v1
+│
+└── report_generation
+    ├── v1
+    └── v2
+```
+
+Each version stores:
+
+```text
+Version
+Parent version
+Creator
+Creation reason
+Dependencies
+Tools
+Tests
+Evaluations
+Regression results
+Permissions
+Risk
+Usage statistics
+Failure statistics
+Provenance
+```
+
+---
+
+# 31. Three Logical Registries
+
+I would implement three registries.
+
+## 1. Tool Registry
+
+```text
+Tools
+MCP servers
+APIs
+Functions
+Executables
+```
+
+## 2. Skill Registry
+
+```text
+Skills
+Procedures
+Workflows
+Compositions
+```
+
+## 3. Evaluator Registry
+
+```text
+Functional evaluators
+Generalization evaluators
+Security evaluators
+Regression suites
+```
+
+Relationship:
+
+```text
+Skill
+ │
+ ├── Tools
+ ├── Dependencies
+ ├── Evaluators
+ └── Policies
+```
+
+---
+
+# 32. Capability Graph
+
+The Capability Graph represents:
+
+```text
+Tool dependencies
+Skill dependencies
+Skill compositions
+Capability relationships
+Transfer relationships
+Impact relationships
+```
+
+Example:
+
+```text
+Security Audit
+      │
+      ├── Repository Analysis
+      │        │
+      │        └── GitHub
+      │
+      ├── Dependency Analysis
+      │        │
+      │        └── NPM
+      │
+      └── Vulnerability Analysis
+               │
+               └── CVE Database
+```
+
+If:
+
+```text
+NPM API changes
+```
+
+CapForge can identify:
+
+```text
+NPM API
+   ↓
+Dependency Analysis
+   ↓
+Security Audit
+   ↓
+Dependent capabilities
+```
+
+This enables **impact analysis before changes are promoted**.
+
+---
+
+# 33. Versioning
+
+CapForge should support:
+
+```text
+v1
+ ↓
+v2
+ ↓
+v3
+```
+
+with:
+
+```text
+Promote
+Rollback
+Branch
+Compare
+Freeze
+Deprecate
+Retire
+```
+
+Every new version should preserve:
+
+```text
+parent_version
+change_reason
+experience_source
+evaluation_results
+regression_results
+provenance
+```
+
+---
+
+# 34. Production vs Learning Runtime
+
+This distinction is mandatory.
+
+## Production
+
+```text
+Agent
+ ↓
+Capability Router
+ ↓
+Capability Firewall
+ ↓
+Verified Capability
+ ↓
+Tool
+ ↓
+Result
+```
+
+Characteristics:
+
+```text
+Fast
+Stable
+Read-mostly
+Controlled
+Audited
+```
+
+## Learning
+
+```text
+Trace
+ ↓
+Experience Filter
+ ↓
+Gap Detection
+ ↓
+Acquisition
+ ↓
+Synthesis
+ ↓
+Test Generation
+ ↓
+Sandbox
+ ↓
+Evaluation
+ ↓
+Regression
+ ↓
+Security
+ ↓
+Policy
+ ↓
+Version
+ ↓
+Promotion
+```
+
+Characteristics:
+
+```text
+Asynchronous
+Experimental
+Isolated
+Resource-controlled
+Potentially expensive
+Non-production
+```
+
+---
+
+# 35. Production Technology Architecture
+
+## Initial implementation
+
+```text
+Backend
+──────────────
+Python
+FastAPI
+Pydantic
+
+Agent Integration
+──────────────────
+LangGraph Adapter
+OpenAI Agents SDK Adapter
+MCP
+A2A interface
+
+Storage
+──────────────
+PostgreSQL
+pgvector
+Redis
+Object Storage
+
+Sandbox
+──────────────
+Docker
+
+Frontend
+──────────────
+React
+Next.js
+
+Observability
+──────────────
+OpenTelemetry-compatible events
+Prometheus
+Grafana
+```
+
+For durable learning workflows, evaluate:
+
+```text
+Temporal
+```
+
+rather than immediately building a complex custom workflow engine.
+
+---
+
+# 36. Initial Data Architecture
+
+```text
+                  ┌──────────────────────┐
+                  │      PostgreSQL      │
+                  │                      │
+                  │ Capabilities         │
+                  │ Versions             │
+                  │ Tools                │
+                  │ Evaluators           │
+                  │ Dependencies         │
+                  │ Policies             │
+                  │ Evaluations          │
+                  └──────────┬───────────┘
+                             │
+                         pgvector
+                             │
+                             ▼
+                     Semantic Retrieval
+
+
+                  ┌──────────────────────┐
+                  │        Redis         │
+                  │                      │
+                  │ Queues               │
+                  │ Locks                │
+                  │ Cache                │
+                  │ Short-lived state    │
+                  └──────────────────────┘
+
+
+                  ┌──────────────────────┐
+                  │    Object Storage    │
+                  │                      │
+                  │ Traces               │
+                  │ Artifacts             │
+                  │ Test datasets        │
+                  │ Sandbox outputs      │
+                  │ Evidence             │
+                  └──────────────────────┘
+```
+
+At scale:
+
+```text
+Kafka / Redpanda
+```
+
+can be introduced for high-volume event streaming.
+
+Don't make it mandatory for v1.
+
+---
+
+# 37. Durable Learning Workflow
+
+The learning process should be resumable.
+
+```text
+Learning Job
+    ↓
+Acquire
+    ↓
+Construct
+    ↓
+Test
+    ↓
+Sandbox
+    ↓
+Evaluate
+    ↓
+Regression
+    ↓
+Security
+    ↓
+Approval
+    ↓
+Promote
+```
+
+It should survive:
+
+```text
+Process crash
+Network failure
+Timeout
+Retry
+Human approval wait
+Partial completion
+External source failure
+```
+
+This is why a durable workflow system such as Temporal is worth evaluating for the production implementation.
+
+---
+
+# 38. Core APIs
+
+Initial API surface:
+
+```http
+POST /v1/events
+```
+
+Receive agent events.
+
+```http
+POST /v1/capabilities/analyze
+```
+
+Determine required capabilities.
+
+```http
+POST /v1/capabilities/search
+```
+
+Search capabilities.
+
+```http
+GET /v1/capabilities/{id}
+```
+
+Retrieve capability.
+
+```http
+POST /v1/learning/jobs
+```
+
+Start capability acquisition.
+
+```http
+GET /v1/learning/jobs/{id}
+```
+
+Get learning-job status.
+
+```http
+POST /v1/skills/{id}/evaluate
+```
+
+Evaluate candidate.
+
+```http
+POST /v1/skills/{id}/promote
+```
+
+Promote verified capability.
+
+```http
+POST /v1/skills/{id}/rollback
+```
+
+Rollback capability.
+
+```http
+GET /v1/skills/{id}/versions
+```
+
+Get version history.
+
+```http
+GET /v1/capability-graph/{id}
+```
+
+Get dependency/impact graph.
+
+Later:
+
+```http
+POST /v1/tools
+POST /v1/tools/{id}/evaluate
+POST /v1/tools/{id}/promote
+POST /v1/evaluators
+POST /v1/policies
+```
+
+---
+
+# 39. Killer Demonstration
+
+The initial demo should be a **software-engineering agent**, because the results can be measured objectively.
+
+Start:
+
+```text
+Ordinary Agent
+```
+
+Initial capabilities:
+
+```text
+✓ Python
+✓ GitHub
+✓ Code analysis
+✓ Testing
+```
+
+Unknown capability:
+
+```text
+✗ Kubernetes incident analysis
+```
+
+Give it a task:
+
+> "Analyze this Kubernetes incident and identify the root cause."
+
+Agent:
+
+```text
+Capability missing
+       ↓
+CapForge detects gap
+```
+
+Then:
+
+```text
+Web / Documentation / GitHub
+             ↓
+       Evidence Collection
+             ↓
+       Capability Design
+             ↓
+       Candidate Skill
+             ↓
+       Generated Tests
+             ↓
+       Docker Sandbox
+             ↓
+       Evaluation
+             ↓
+       Regression
+             ↓
+       Risk Gate
+             ↓
+       Skill v1
+```
+
+Then:
+
+```text
+Task 2
+ ↓
+Existing Kubernetes skill
+ ↓
+Reuse
+```
+
+Task 3:
+
+```text
+Different Kubernetes problem
+ ↓
+Transfer
+```
+
+Task 4:
+
+```text
+Failure
+ ↓
+Experience Filter
+ ↓
+Skill improvement
+ ↓
+Skill v2
+ ↓
+Regression
+ ↓
+Promotion
+```
+
+Now the agent has demonstrably gained a new capability.
+
+---
+
+# 40. Experimental Setup
+
+The strongest experiment is:
+
+## Baseline
+
+```text
+Existing Agent
+```
+
+## Treatment
+
+```text
+Existing Agent
++
+CapForge
+```
+
+Use the same:
+
+```text
+LLM
+Prompt
+Tools
+Task distribution
+Hardware
+Model temperature/configuration
+```
+
+The difference should be:
+
+```text
+CapForge = ON/OFF
+```
+
+This isolates the contribution.
+
+---
+
+# 41. Evaluation Metrics
+
+We should measure at least:
+
+### 1. Capability Acquisition Rate
+
+How quickly new verified capabilities are acquired.
+
+```text
+Verified capabilities
+──────────────────────
+Learning opportunities
+```
+
+---
+
+### 2. Time-to-Capability
+
+```text
+Capability gap detected
+          ↓
+Capability verified
+```
+
+---
+
+### 3. Skill Reuse Rate
+
+How frequently acquired skills are reused.
+
+---
+
+### 4. Transfer Success
+
+```text
+Skill learned on Task A
+          ↓
+Success on unseen Task B
+```
+
+---
+
+### 5. Recovery Rate
+
+```text
+Failure
+ ↓
+Learning
+ ↓
+Successful future execution
+```
+
+---
+
+### 6. Regression Rate
+
+Percentage of existing capabilities negatively affected by updates.
+
+This should ideally remain extremely low.
+
+---
+
+### 7. Capability Retention
+
+Does the agent retain useful capabilities over long task sequences?
+
+---
+
+### 8. Learning Cost
+
+Measure:
+
+```text
+LLM tokens
+API calls
+compute
+time
+financial cost
+sandbox executions
+```
+
+---
+
+### 9. Capability Growth
+
+The central long-term measurement:
+
+```text
+Initial verified capabilities
+            ↓
+        CapForge
+            ↓
+Final verified capabilities
+```
+
+---
+
+# 42. The Fundamental Experiment
+
+The final experiment should look like:
+
+```text
+                    Initial Agent
+                         │
+             ┌───────────┴───────────┐
+             │                       │
+        Baseline                 CapForge
+             │                       │
+             ▼                       ▼
+        Task Sequence          Task Sequence
+             │                       │
+             ▼                       ▼
+        Static Capability       Capability Growth
+                                     │
+                              ┌──────┼──────┐
+                              ▼      ▼      ▼
+                            Learn  Reuse  Evolve
+```
+
+The hypothesis:
+
+> **Agents equipped with CapForge should acquire and reuse verified capabilities over time, enabling improved performance on later tasks without modifying or retraining the underlying foundation model.**
+
+---
+
+# 43. What makes CapForge different
+
+We should **not** claim:
+
+> "CapForge invented self-learning skills."
+
+That would be incorrect given existing work such as Voyager, Reflexion, Trace2Skill, SkillOpt, SkillMaster, OpenSkill and SkillSmith.
+
+Instead, the contribution is:
+
+> **CapForge proposes a framework-agnostic capability lifecycle for existing agentic systems, separating production execution from asynchronous capability acquisition, verification, governance, versioning and regression protection.**
+
+The distinguishing lifecycle is:
+
+```text
+DISCOVER
+   ↓
+ACQUIRE
+   ↓
+CONSTRUCT
+   ↓
+VERIFY
+   ↓
+PROMOTE
+   ↓
+DEPLOY
+   ↓
+MONITOR
+   ↓
+REUSE
+   ↓
+EVOLVE
+   ↓
+REGRESSION TEST
+   ↓
+VERSION / ROLLBACK
+```
+
+And importantly, it supports **both skill evolution and tool evolution**.
+
+---
+
+# 44. What the first version should NOT attempt
+
+Even though the final platform can become very large, v1 should remain controlled.
+
+I would **not** initially build:
+
+```text
+❌ Every agent framework
+❌ Fully autonomous tool creation with unrestricted privileges
+❌ Distributed global capability marketplace
+❌ Complex multi-agent skill trading
+❌ Foundation-model fine-tuning
+❌ Automatic modification of CapForge itself
+❌ Kafka-based distributed infrastructure from day one
+❌ Huge microservice architecture
+```
+
+Instead:
+
+```text
+✓ LangGraph
+✓ OpenAI Agents SDK
+✓ MCP
+✓ One custom adapter
+✓ Skill acquisition
+✓ Controlled tool generation
+✓ Sandbox
+✓ Evaluation
+✓ Regression
+✓ Registry
+✓ Versioning
+✓ Governance
+✓ Capability routing
+```
+
+Then expand.
+
+---
+
+# 45. Recommended v1 Architecture
+
+I would initially implement roughly **six deployable services**, rather than 18 microservices.
+
+```text
+┌──────────────────────────────────────────────────────────┐
+│                    CapForge API                       │
+│                                                        │
+│ Adapter Gateway                                        │
+│ Capability Analyzer                                    │
+│ Capability Router                                      │
+│ Registry API                                           │
+└──────────────────────┬───────────────────────────────────┘
+                       │
+                       ▼
+              ┌─────────────────┐
+              │ Learning Worker │
+              │                 │
+              │ Acquisition     │
+              │ Synthesis       │
+              │ Test Generation │
+              └────────┬────────┘
+                       │
+                       ▼
+              ┌─────────────────┐
+              │ Sandbox Worker  │
+              │                 │
+              │ Docker          │
+              │ Tests           │
+              │ Evaluation      │
+              └────────┬────────┘
+                       │
+                       ▼
+              ┌─────────────────┐
+              │ Governance      │
+              │ & Promotion     │
+              └─────────────────┘
+```
+
+Supporting infrastructure:
+
+```text
+PostgreSQL + pgvector
+Redis
+Object Storage
+Temporal
+OpenTelemetry
+```
+
+Frontend:
+
+```text
+Next.js
+```
+
+This gives us production-like separation without prematurely creating a distributed-system nightmare.
+
+---
+
+# 46. CapForge Dashboard
+
+The eventual dashboard should show:
+
+### Agent Overview
+
+```text
+Agents connected: 12
+Capabilities: 247
+Tools: 81
+Active learning jobs: 4
+Pending approvals: 2
+```
+
+### Capability Growth
+
+```text
+Day 1       50
+Day 7       71
+Day 14      103
+Day 30      147
+```
+
+### Learning Jobs
+
+```text
+Kubernetes analysis
+Status: Testing
+Version: 1.2
+Progress: 82%
+```
+
+### Capability Detail
+
+```text
+github.security_analysis
+
+Version: 3.1
+Status: Production
+Risk: Medium
+
+Functional:      94%
+Generalization:  89%
+Regression:      PASS
+
+Dependencies:
+    GitHub
+    Source Analyzer
+    CVE Database
+```
+
+### Version History
+
+```text
+v1 ── v2 ── v3
+      │
+      └── Regression → rejected
+```
+
+This makes the system explainable rather than a black box.
+
+---
+
+# 47. Final CapForge Architecture in One View
+
+```text
+                              USER
+                                │
+                                ▼
+                     ┌───────────────────┐
+                     │ EXISTING AGENT    │
+                     │                   │
+                     │ LangGraph         │
+                     │ OpenAI SDK        │
+                     │ CrewAI            │
+                     │ AutoGen           │
+                     │ Custom            │
+                     └─────────┬─────────┘
+                               │
+                    ┌──────────┼──────────┐
+                    │          │          │
+                   MCP        A2A       Events
+                    │          │          │
+                    └──────────┼──────────┘
+                               ▼
+╔══════════════════════════════════════════════════════════════════╗
+║                         CAPFORGE                              ║
+║                                                                  ║
+║                    CAPABILITY CONTROL PLANE                      ║
+║                                                                  ║
+║  Event Gateway → Analyzer → Router → Firewall → Registry        ║
+║                         │                                        ║
+║                         ▼                                        ║
+║                    Capability Gap                                ║
+║                         │                                        ║
+╚═════════════════════════╪════════════════════════════════════════╝
+                          │
+                          ▼
+╔══════════════════════════════════════════════════════════════════╗
+║                LEARNING & VERIFICATION PLANE                     ║
+║                                                                  ║
+║ Experience Filter                                                ║
+║        ↓                                                         ║
+║ Acquisition                                                      ║
+║        ↓                                                         ║
+║ Web / GitHub / Docs / MCP / Tools / Experience                   ║
+║        ↓                                                         ║
+║ Evidence                                                         ║
+║        ↓                                                         ║
+║ Skill + Tool Synthesizer                                         ║
+║        ↓                                                         ║
+║ Test Generator                                                   ║
+║        ↓                                                         ║
+║ Sandbox                                                          ║
+║        ↓                                                         ║
+║ Structural → Functional → Generalization → Regression            ║
+║        ↓                                                         ║
+║ Security / Risk                                                  ║
+║        ↓                                                         ║
+║ Governance                                                       ║
+║        ↓                                                         ║
+║ Version / Approval                                               ║
+║        ↓                                                         ║
+║ Capability Registry                                              ║
+╚═════════════════════════╪════════════════════════════════════════╝
+                          │
+                          ▼
+                  VERIFIED CAPABILITY
+                          │
+                          ▼
+                  EXISTING AGENT
+                          │
+                          ▼
+                  MORE CAPABLE AGENT
+```
+
+---
+
+# 48. The complete CapForge loop
+
+There are actually **two loops**.
+
+### Runtime loop
+
+```text
+TASK
+ ↓
+ANALYZE
+ ↓
+RETRIEVE
+ ↓
+ROUTE
+ ↓
+EXECUTE
+ ↓
+EVALUATE
+ ↓
+RESULT
+```
+
+### Evolution loop
+
+```text
+EXPERIENCE
+ ↓
+FILTER
+ ↓
+CAPABILITY GAP
+ ↓
+ACQUIRE
+ ↓
+CONSTRUCT
+ ↓
+SANDBOX
+ ↓
+VERIFY
+ ↓
+GENERALIZE
+ ↓
+REGRESSION
+ ↓
+RISK
+ ↓
+PROMOTE
+ ↓
+REGISTER
+ ↓
+REUSE
+ ↓
+MONITOR
+ ↓
+EVOLVE
+```
+
+Together:
+
+```text
+                 ┌──────────────────────┐
+                 │     EXISTING AGENT   │
+                 └──────────┬───────────┘
+                            │
+                         execute
+                            │
+                            ▼
+                    ┌───────────────┐
+                    │   EXPERIENCE  │
+                    └───────┬───────┘
+                            │
+                      valuable?
+                       /         \
+                     NO           YES
+                     │             │
+                     │             ▼
+                     │       LEARNING LOOP
+                     │             │
+                     │             ▼
+                     │      NEW CAPABILITY
+                     │             │
+                     └─────────────┤
+                                   ▼
+                           CAPABILITY REGISTRY
+                                   │
+                                   ▼
+                              REUSE / COMPOSE
+                                   │
+                                   ▼
+                              AGENT IMPROVES
+```
+
+---
+
+# 49. Final architectural principle
+
+If we have to reduce the entire project to one sentence:
+
+> **CapForge is a framework-independent capability evolution layer that observes existing agents, identifies capability gaps, acquires or constructs skills and tools, validates them in isolation, governs their promotion, versions them, and makes verified capabilities available to agents without modifying the underlying foundation model.**
+
+And the fundamental safety invariant is:
+
+> **No learned or modified capability becomes trusted production capability without provenance, isolation, evaluation, regression testing, risk assessment, and version-controlled promotion.**
+
+---
+
+## 50. What we should consider "frozen" now
+
+Based on everything we've discussed, I would treat these as **final architectural decisions**:
+
+| Decision              | Final                                                                |
+| --------------------- | -------------------------------------------------------------------- |
+| Product               | CapForge                                                           |
+| Purpose               | Capability evolution for existing agents                             |
+| Agent replacement?    | **No**                                                               |
+| Framework-specific?   | **No**                                                               |
+| Initial frameworks    | **LangGraph + OpenAI Agents SDK + MCP**                              |
+| Future integrations   | **CrewAI, AutoGen, Microsoft Agent Framework, custom, A2A**          |
+| Skills                | **Yes**                                                              |
+| Workflows             | **Yes**                                                              |
+| Tool creation         | **Yes, controlled**                                                  |
+| Tool modification     | **Yes, controlled**                                                  |
+| Web learning          | **Yes**                                                              |
+| GitHub learning       | **Yes**                                                              |
+| Documentation         | **Yes**                                                              |
+| Existing tools        | **Yes**                                                              |
+| Existing experiences  | **Yes**                                                              |
+| Production learning   | **Asynchronous only**                                                |
+| Sandbox               | **Mandatory for new/modified capabilities**                          |
+| Evaluation            | **Structural + Functional + Generalization + Regression + Security** |
+| Low-risk promotion    | **Automatic, policy-controlled**                                     |
+| High-risk promotion   | **Human approval**                                                   |
+| Versioning            | **Mandatory**                                                        |
+| Rollback              | **Mandatory**                                                        |
+| Provenance            | **Mandatory**                                                        |
+| Capability Graph      | **Yes**                                                              |
+| Capability Firewall   | **Yes**                                                              |
+| Production governance | **Immutable from autonomous learning**                               |
+| Primary DB            | **PostgreSQL + pgvector**                                            |
+| Cache/queue           | **Redis**                                                            |
+| Sandbox               | **Docker initially**                                                 |
+| Workflow engine       | **Evaluate Temporal**                                                |
+| Event architecture    | **OpenTelemetry-compatible**                                         |
+| Event broker          | **Redis initially; Kafka/Redpanda later if needed**                  |
+| Frontend              | **Next.js/React**                                                    |
+| Core language         | **Python**                                                           |
+| Backend               | **FastAPI**                                                          |
+| Research comparison   | **Existing Agent vs Existing Agent + CapForge**                    |
+
+### The final mental model
+
+```text
+                 EXISTING AGENTIC ECOSYSTEM
+                            │
+                            │
+                    ┌───────▼───────┐
+                    │   CAPFORGE  │
+                    │               │
+                    │ OBSERVE       │
+                    │ DISCOVER      │
+                    │ ACQUIRE       │
+                    │ CONSTRUCT     │
+                    │ VERIFY        │
+                    │ GOVERN        │
+                    │ VERSION       │
+                    │ PROMOTE       │
+                    │ MONITOR       │
+                    │ EVOLVE        │
+                    └───────┬───────┘
+                            │
+                            ▼
+                 VERIFIED CAPABILITY
+                            │
+                            ▼
+                    EXISTING AGENT
+                            │
+                            ▼
+                 MORE CAPABLE AGENT
+                            │
+                            ▼
+                       NEW EXPERIENCE
+                            │
+                            └───────────────►
+                              Evolution Loop
+```
+
+**This is the version I would now use as the canonical foundation for the project.** The next engineering step should be to turn this specification into the **formal CapForge v1 design**: the capability ontology, database schema, event schema, adapter interface, state machines, API contracts, learning workflow, evaluation protocol, and repository/module structure.

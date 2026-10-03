@@ -22,6 +22,7 @@ from slowapi.util import get_remote_address
 
 from capforge.acquisition.engine import AcquisitionEngine
 from capforge.acquisition.jobs import LearningJob, LearningJobManager
+from capforge.core.budget import budget_manager
 from capforge.core.config import settings, setup_logging
 from capforge.core.events import EventGateway, ExperienceFilter
 from capforge.core.governance import (
@@ -64,12 +65,14 @@ from capforge.runtime.pipeline import (
     CapabilityPipelineRunner,
     PipelineExecutionResponse,
 )
+from capforge.security.privacy_filter import privacy_filter
 from capforge.server.auth import (
     APIKeyRecord,
     UserRole,
     auth_manager,
     require_roles,
 )
+from capforge.verification.benchmark import BenchmarkSuite, benchmark_registry
 from capforge.verification.evaluator import CapabilityEvaluator
 from capforge.verification.test_generator import TestGenerator
 from capforge.versioning.manager import VersionManager
@@ -712,6 +715,57 @@ def revoke_api_key(
     if not success:
         raise HTTPException(status_code=404, detail=f"API key '{key_id}' not found.")
     return {"revoked": True, "key_id": key_id}
+
+
+# ---------------------------------------------------------------------------
+# Budget, Benchmarks & Privacy Routes
+# ---------------------------------------------------------------------------
+
+
+class SanitizeRequest(BaseModel):
+    text: str | None = None
+    data: dict[str, Any] | None = None
+
+
+@app.get("/v1/budget", tags=["Budget & Quota"])
+def get_evolution_budget():
+    """Retrieve current evolution compute and LLM API cost consumption."""
+    return budget_manager.get_budget_status()
+
+
+@app.post("/v1/budget/reset", tags=["Budget & Quota"])
+def reset_evolution_budget(
+    current_user: APIKeyRecord = Depends(require_roles(UserRole.ADMIN)),
+):
+    """Reset daily/hourly budget counters (Admin only)."""
+    budget_manager.reset_quotas()
+    return {"message": "Evolution budget quotas reset successfully."}
+
+
+@app.get("/v1/benchmarks", tags=["Benchmarks & Evaluation"])
+def list_benchmarks() -> list[str]:
+    """List available domain evaluation benchmark suites."""
+    return benchmark_registry.list_suites()
+
+
+@app.get("/v1/benchmarks/{suite_id}", response_model=BenchmarkSuite, tags=["Benchmarks & Evaluation"])
+def get_benchmark_suite(suite_id: str):
+    """Retrieve details and task definitions for a specific benchmark suite."""
+    suite = benchmark_registry.get_suite(suite_id)
+    if not suite:
+        raise HTTPException(status_code=404, detail=f"Benchmark suite '{suite_id}' not found.")
+    return suite
+
+
+@app.post("/v1/privacy/sanitize", tags=["Security & Privacy"])
+def sanitize_trace_payload(req: SanitizeRequest):
+    """Scrub sensitive credentials, API keys, and PII from traces or text payloads."""
+    resp: dict[str, Any] = {}
+    if req.text is not None:
+        resp["sanitized_text"] = privacy_filter.sanitize_text(req.text)
+    if req.data is not None:
+        resp["sanitized_data"] = privacy_filter.sanitize_data(req.data)
+    return resp
 
 
 # ---------------------------------------------------------------------------

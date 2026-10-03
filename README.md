@@ -6,7 +6,7 @@
 [![Version: 1.1.0](https://img.shields.io/badge/version-1.1.0-blue.svg)](versions.mdx)
 [![Python: 3.10 | 3.11 | 3.12](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Tests: 188/188 Passed](https://img.shields.io/badge/tests-188%2F188%20Passed%20(100%25)-brightgreen.svg)](tests/)
+[![Tests: 191/191 Passed](https://img.shields.io/badge/tests-191%2F191%20Passed%20(100%25)-brightgreen.svg)](tests/)
 [![Code Style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-red.svg)](https://docs.pydantic.dev/)

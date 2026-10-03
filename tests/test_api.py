@@ -262,4 +262,42 @@ class TestTelemetryAndGovernanceAPI:
         assert approve_resp.json()["reviewed_by"] == "secops_lead"
 
 
+class TestBudgetAndBenchmarkAPI:
+    def test_get_budget(self, client):
+        resp = client.get("/v1/budget")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "daily_calls" in data
+        assert "daily_cost_usd" in data
+        assert "max_cost_usd" in data
+
+    def test_list_and_get_benchmarks(self, client):
+        resp = client.get("/v1/benchmarks")
+        assert resp.status_code == 200
+        suites = resp.json()
+        assert "software_engineering_v1" in suites
+
+        detail_resp = client.get("/v1/benchmarks/software_engineering_v1")
+        assert detail_resp.status_code == 200
+        detail = detail_resp.json()
+        assert detail["id"] == "software_engineering_v1"
+        assert len(detail["tasks"]) >= 2
+
+    def test_privacy_sanitize_endpoint(self, client):
+        resp = client.post(
+            "/v1/privacy/sanitize",
+            json={
+                "text": "Call agent with key sk-proj-1234567890abcdef1234567890 and email test@corp.org",
+                "data": {"secret_token": "my-secret-token", "count": 10},
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "[REDACTED_OPENAI_KEY]" in data["sanitized_text"]
+        assert "[REDACTED_EMAIL]" in data["sanitized_text"]
+        assert data["sanitized_data"]["secret_token"] == "[REDACTED_SECRET]"
+        assert data["sanitized_data"]["count"] == 10
+
+
+
 
