@@ -11,6 +11,12 @@ requires-python = ">=3.11"
 authors = [
     { name = "CapForge Core Team" }
 ]
+
+[project.urls]
+Homepage = "https://github.com/AltioraLabs/CapForge"
+Documentation = "https://altioralabs.github.io/CapForge/"
+Repository = "https://github.com/AltioraLabs/CapForge.git"
+Issues = "https://github.com/AltioraLabs/CapForge/issues"
 dependencies = [
     "pydantic>=2.5.0",
     "fastapi>=0.110.0",

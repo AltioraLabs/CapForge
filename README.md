@@ -4,7 +4,7 @@
 
 ### Autonomous Capability Evolution, SMT Formal Verification, and JIT Optimization Runtime for AI Agents
 
-[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/abhay-2108/CapForge)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/AltioraLabs/CapForge)
 [![Python: 3.10 | 3.11 | 3.12](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Tests: 234/234 Passed](https://img.shields.io/badge/tests-234%2F234%20Passed%20(100%25)-brightgreen.svg)](tests/)
@@ -43,7 +43,7 @@ Most autonomous AI agents (built with LangGraph, CrewAI, AutoGen, or OpenAI Assi
 pip install capforge
 
 # Or install latest release directly from GitHub:
-pip install git+https://github.com/abhay-2108/CapForge.git
+pip install git+https://github.com/AltioraLabs/CapForge.git
 
 # With SMT formal verification (Z3 & SymPy) and all optional tools:
 pip install "capforge[all]"
@@ -393,7 +393,7 @@ pytest tests/test_benchmarks.py -v
 For detailed architecture diagrams, interactive API explorers, tutorials, and the **Live Capability Evolution Lab**, see the documentation site:
 
 * **Local Documentation:** Open [`docs/site/index.html`](docs/site/index.html) in your browser.
-* **Online Documentation:** Hosted via GitHub Pages at `https://abhay-2108.github.io/CapForge/`.
+* **Online Documentation:** Hosted via GitHub Pages at `https://altioralabs.github.io/CapForge/`.
 
 ---
 
@@ -401,7 +401,7 @@ For detailed architecture diagrams, interactive API explorers, tutorials, and th
 
 ```bash
 # Clone repository for local development
-git clone https://github.com/abhay-2108/CapForge.git
+git clone https://github.com/AltioraLabs/CapForge.git
 cd CapForge
 
 # Create and activate virtual environment
