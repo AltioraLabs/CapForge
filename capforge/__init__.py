@@ -72,6 +72,7 @@ _LAZY_IMPORTS = {
     "VersionManager": "capforge.versioning.manager",
     # Runtime
     "CapForgeAgent": "capforge.runtime.agent_adapter",
+    "LangGraphAdapter": "capforge.runtime.agent_adapter",
     "CapabilityPipeline": "capforge.runtime.pipeline",
     "CapabilityPipelineRunner": "capforge.runtime.pipeline",
     "PipelineExecutionResponse": "capforge.runtime.pipeline",

@@ -32,6 +32,7 @@
 
     <nav class="topbar-nav">
       <a href="#quickstart">Quickstart</a>
+      <a href="#multi-agent-guide">Multi-Agent Guide</a>
       <a href="#architecture">Architecture</a>
       <a href="#sdk">Python SDK</a>
       <a href="#mcp">MCP Hub</a>
@@ -131,6 +132,11 @@
 
       <div class="nav-group">
         <div class="nav-group-title">Developer Guides</div>
+        <a class="nav-link" href="#multi-agent-guide">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Multi-Agent Integration</span>
+          <span class="nav-badge hot">Workflow</span>
+        </a>
         <a class="nav-link" href="#sdk">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
           <span>Python SDK Client</span>
@@ -375,10 +381,10 @@ client = CapForgeClient(
 health = client.health_check()
 print("Cluster Health:", health)
 
-# Search existing capabilities via semantic vector store
-results = client.search("calculate portfolio risk under stress")
-for cap in results:
-    print(f"Found: {cap.id} ({cap.version}) - Status: {cap.status}")
+# Search existing capabilities via semantic vector store (returns [(Capability, score)])
+results = client.search("calculate portfolio risk under stress", threshold=0.25)
+for cap, score in results:
+    print(f"Found: {cap.id} ({cap.version}) [score: {score:.2f}] - Status: {cap.status}")
 
 # Execute remotely via REST with automatic HMAC signature verification
 res = client.execute(
@@ -822,21 +828,20 @@ capability:
             <span class="code-lang-tag">python &bull; auto-repair engine</span>
           </div>
           <div class="code-pane active">
-            <pre><code>from capforge.verification.repair import ClosedLoopRepairEngine
+            <pre><code>from capforge.verification.repair import AutoRepairEngine
 
-# Initialize the 3-pass self-healing engine
-repair_engine = ClosedLoopRepairEngine(max_attempts=3)
+# Initialize the 3-pass self-healing engine (AST fixes -> LLM reflection -> Schema alignment)
+repair_engine = AutoRepairEngine(max_iterations=3)
 
 # If sandbox evaluation fails:
-repaired_capability, repair_report = repair_engine.repair(
-    capability=failed_cap,
-    eval_result=eval_result,
-    context={"task_description": "Compute portfolio VaR"}
+repaired_capability, verif_result, report = repair_engine.repair_with_report(
+    capability=failed_cap
 )
 
-if repair_report.success:
-    print(f"Self-Repair Succeeded via {repair_report.pass_name}!")
-    print(f"Attempts used: {repair_report.attempts}")
+if report.final_passed:
+    print(f"Self-Repair Succeeded across {report.iterations_run} iteration(s)!")
+    for step in report.steps:
+        print(f"  * Pass {step.pass_number} ({step.strategy}): {step.description}")
 else:
     print("Repair exhausted. Flagged for human review ticket.")</code></pre>
           </div>
@@ -856,15 +861,172 @@ else:
           <div class="code-pane active">
             <pre><code>from capforge.security.trust_chain import TrustChain
 
-trust = TrustChain(secret_key="enterprise-signing-key")
+# Initialize Trust Chain with HMAC signing key (or set CAPFORGE_SIGNING_KEY in .env)
+trust = TrustChain(signing_key="enterprise-signing-key")
 
-# Sign a verified capability manifest
-signature = trust.sign_capability(capability)
-print("HMAC-SHA256 Signature:", signature)
+# Sign a verified capability manifest at registration
+signature = trust.sign(capability)
+print("HMAC-SHA256 Signature:", signature.hmac_sig)
 
-# Verify tamper-evidence before execution
-is_valid = trust.verify_capability(capability, signature)
+# Cryptographically verify tamper-evidence before execution
+is_valid = trust.verify(capability)
 assert is_valid, "Tamper detected: Capability code body was modified outside Control Plane!"</code></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- MULTI-AGENT WORKFLOW INTEGRATION -->
+      <section class="doc-section" id="multi-agent-guide">
+        <div class="eyebrow">Developer Guides</div>
+        <h2>Integration Guide: Existing Multi-Agent Systems</h2>
+        <p>If you already have a running multi-agent system &mdash; built with <strong>LangGraph, CrewAI, AutoGen, or a custom Python orchestrator</strong> &mdash; CapForge operates as your system's <strong>autonomous capability layer</strong>. It eliminates the fragile "static tool ceiling" where agents halt upon missing capabilities or unhandled parameter schemas.</p>
+
+        <div class="callout tip">
+          <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <div class="callout-content">
+            <strong>How CapForge Enhances Existing Multi-Agent Swarms</strong>
+            <p>You do not need to rewrite your agent prompts or replace your orchestrator. Your existing agents continue coordinating tasks. CapForge sits directly underneath your agent swarm: when any worker agent hits a missing tool or failure, CapForge discovers the gap, synthesizes type-safe code, validates it through the 5-level verification pipeline in an isolated sandbox, promotes it to the shared registry, and immediately equips all agents in the swarm with zero redeployment.</p>
+          </div>
+        </div>
+
+        <div class="arch-plane" style="margin: 24px 0;">
+          <div class="arch-plane-header">
+            <span class="arch-plane-title">Multi-Agent Capability Evolution Topology</span>
+            <span class="arch-plane-latency">Shared In-Memory / WAL Registry</span>
+          </div>
+          <p>Orchestrator delegates tasks &rarr; Worker Agent discovers gap or tool failure &rarr; CapForge synthesizes &amp; verifies in sandbox &rarr; Verified capability promoted to shared registry &rarr; Instant reuse across all agents with zero latency overhead.</p>
+          <div class="arch-plane-grid">
+            <div class="arch-box">Host Orchestrator (LangGraph / CrewAI)</div>
+            <div class="arch-box">Worker Agents (Analyst / Coder / Scribe)</div>
+            <div class="arch-box">CapForge Event Gateway &amp; Gap Detector</div>
+            <div class="arch-box">Shared Capability Registry (SQLite / Postgres)</div>
+          </div>
+        </div>
+
+        <h3>The 5-Step Integration Blueprint</h3>
+
+        <h4>Step 1: Initialize the Shared Registry Client</h4>
+        <p>In your multi-agent application setup or root ecosystem file, instantiate a shared <code class="inline">CapForgeClient</code> pointing to a shared SQLite database file (or PostgreSQL URL in multi-node clusters):</p>
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python &bull; ecosystem.py</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>from pathlib import Path
+from capforge import CapForgeClient
+
+# Shared database file across all agents in your process or cluster
+client = CapForgeClient(db_path=Path("data/capforge.db"))
+
+# Verify registry and sandbox subsystem readiness
+health = client.health_check()
+assert health["subsystems"]["registry"]["status"] == "ok"</code></pre>
+          </div>
+        </div>
+
+        <h4>Step 2: Pre-Register Your Existing Domain Tools</h4>
+        <p>If your project already has existing Python functions or tools, register them so CapForge's semantic gap detector knows they exist and avoids redundant synthesis:</p>
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python &bull; register existing tools</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>from capforge import capability
+
+# Option A: Decorate existing functions directly
+@capability(id="calculate_moving_average", domain="finance", risk_level="LOW")
+def calculate_moving_average(prices: list[float], window: int = 20) -> dict:
+    sma = [round(sum(prices[i-window+1:i+1])/window, 4) for i in range(window-1, len(prices))]
+    return {"sma": sma, "latest": sma[-1]}
+
+client.register(calculate_moving_average, promote=True)
+
+# Option B: Register existing functions without modifying their source file
+def legacy_volatility(returns: list[float]) -> dict:
+    import statistics, math
+    vol = statistics.stdev(returns) * math.sqrt(252)
+    return {"annualized_volatility": round(vol, 4)}
+
+client.register_function(legacy_volatility, id="calculate_volatility", domain="finance", promote=True)</code></pre>
+          </div>
+        </div>
+
+        <h4>Step 3: Handle Capability Gaps &amp; Trigger Autonomous Evolution</h4>
+        <p>When an agent is assigned a task for which no matching capability exists, query CapForge or invoke <code class="inline">client.run_task(...)</code> to trigger the autonomous evolution loop:</p>
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python &bull; worker_agent.py</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>def execute_or_evolve_task(client: CapForgeClient, task_description: str, task_inputs: dict) -> dict:
+    # 1. Search for existing capabilities
+    matches = client.search(query=task_description, threshold=0.30)
+    
+    if matches:
+        best_cap, score = matches[0]
+        # Found existing verified capability -> execute directly in sandbox (< 10ms)
+        res = client.execute(best_cap.id, inputs=task_inputs)
+        return {"status": "REUSED", "capability_id": best_cap.id, "output": res.output}
+    
+    # 2. No matching capability found -> Trigger autonomous acquisition
+    print(f"Capability gap detected for: '{task_description}'. Forging new capability...")
+    lifecycle_trace = client.run_task(
+        task_intent=task_description,
+        inputs=task_inputs,
+        agent_id="risk_analyst_agent"
+    )
+    
+    if lifecycle_trace.execution_result and lifecycle_trace.execution_result.status == "SUCCESS":
+        new_cap = lifecycle_trace.acquired_capability
+        print(f"Acquired and verified '{new_cap.id}' (v{new_cap.version}) in {lifecycle_trace.repair_iterations} repair iteration(s)!")
+        return {"status": "EVOLVED", "capability_id": new_cap.id, "output": lifecycle_trace.execution_result.output}
+    
+    err = lifecycle_trace.execution_result.error if lifecycle_trace.execution_result else "Verification failed"
+    raise RuntimeError(f"Capability acquisition failed: {err}")</code></pre>
+          </div>
+        </div>
+
+        <h4>Step 4: Dynamic Tool Re-use Across the Entire Agent Swarm</h4>
+        <p>Once a capability is acquired and promoted to <code class="inline">ACTIVE</code>, it is permanently persisted in the SQLite/PostgreSQL registry. Any other agent in your system can now call it with zero synthesis overhead:</p>
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python &bull; swarm_reuse.py</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code># Subsequent execution by any other agent in the swarm:
+# Zero latency synthesis -> instant cached execution from shared registry
+res = client.execute("monte_carlo_var", {"portfolio_value": 5000000.0, "confidence": 0.99})
+print("Result:", res.output)
+print("Execution time:", f"{res.execution_time_ms:.2f} ms")</code></pre>
+          </div>
+        </div>
+
+        <h4>Step 5: Subscribe to Multi-Agent Telemetry &amp; Webhooks</h4>
+        <p>Connect your existing logging, alerting, or audit pipeline directly to the CapForge Universal Event Gateway:</p>
+        <div class="code-box">
+          <div class="code-header">
+            <span class="code-lang-tag">python &bull; observability.py</span>
+          </div>
+          <div class="code-pane active">
+            <pre><code>from capforge.core.models import AgentEvent, EventType
+
+def on_lifecycle_event(event: AgentEvent) -> None:
+    if event.event_type == EventType.SKILL_PROMOTED:
+        print(f"[AUDIT] New skill promoted: {event.metadata.get('capability_id')} v{event.metadata.get('version')} by agent {event.agent_id}")
+    elif event.event_type == EventType.CAPABILITY_GAP_DETECTED:
+        print(f"[AUDIT] Capability gap flagged: {event.metadata.get('missing')}")
+    elif event.event_type == EventType.TOOL_FAILED:
+        print(f"[ALERT] Tool failure detected: {event.error_message}")
+
+# Subscribe to all internal events
+client.event_gateway.subscribe_all(on_lifecycle_event)
+
+# Or deliver signed HMAC webhooks to external services:
+client.subscribe_webhook(
+    url="https://api.yourcompany.com/agent-audit",
+    events=["capability.promoted", "gap.detected"],
+    secret="your-shared-hmac-secret"
+)</code></pre>
           </div>
         </div>
       </section>
@@ -881,6 +1043,7 @@ assert is_valid, "Tamper detected: Capability code body was modified outside Con
               <button class="code-tab-btn active" data-pane="sdk-local">Local Embedded Client</button>
               <button class="code-tab-btn" data-pane="sdk-batch">Batch Execution</button>
               <button class="code-tab-btn" data-pane="sdk-search">Semantic Discovery</button>
+              <button class="code-tab-btn" data-pane="sdk-bridges">LLM Tool Bridges</button>
             </div>
             <span class="code-lang-tag">python</span>
           </div>
@@ -901,9 +1064,10 @@ with CapForgeClient() as client:
     # Register and automatically promote
     client.register(summarize, promote=True)
 
-    # Execute
+    # Execute safely in isolated sandbox
     res = client.execute("text_summarizer", {"text": "CapForge autonomously evolves capabilities."})
-    print(res.output)</code></pre>
+    print("Output:", res.output)
+    print("Execution time:", f"{res.execution_time_ms:.2f} ms")</code></pre>
           </div>
 
           <div class="code-pane" id="sdk-batch">
@@ -915,22 +1079,36 @@ requests = [
 ]
 
 with CapForgeClient() as client:
-    results = client.batch_execute(requests, max_concurrency=5)
+    results = client.execute_batch(requests)
     for res in results:
-        print(f"Status: {res.status} | Latency: {res.latency_ms:.2f}ms")</code></pre>
+        print(f"Status: {res.status} | Execution Time: {res.execution_time_ms:.2f}ms")</code></pre>
           </div>
 
           <div class="code-pane" id="sdk-search">
             <pre><code>with CapForgeClient() as client:
-    # Hybrid BM25 + Vector semantic capability search
+    # Hybrid BM25 + Vector semantic capability search (returns [(Capability, float)])
     matches = client.search(
         query="Monte Carlo simulation for portfolio risk",
-        domain="finance",
-        top_k=3
+        threshold=0.25
     )
 
-    for cap in matches:
-        print(f"Match: {cap.id} (v{cap.version}) - Status: {cap.status}")</code></pre>
+    for cap, score in matches:
+        print(f"Match: {cap.id} (v{cap.version}) | Score: {score:.2f} - Status: {cap.status}")</code></pre>
+          </div>
+
+          <div class="code-pane" id="sdk-bridges">
+            <pre><code>with CapForgeClient() as client:
+    # Export directly to OpenAI function tool format
+    openai_tool = client.to_openai_tool("text_summarizer")
+    print("OpenAI Tool:", openai_tool["function"]["name"])
+
+    # Export directly to CrewAI BaseTool wrapper
+    crewai_tool = client.to_crewai_tool("text_summarizer")
+    print("CrewAI Tool:", crewai_tool.name)
+
+    # Generic standard tool schema for Anthropic / LangChain
+    std_tool = client.as_tool("text_summarizer")
+    print("Standard Schema:", std_tool)</code></pre>
           </div>
         </div>
       </section>
@@ -939,7 +1117,7 @@ with CapForgeClient() as client:
       <section class="doc-section" id="langgraph">
         <div class="eyebrow">Developer Guides</div>
         <h2>LangGraph Integration</h2>
-        <p>Integrate CapForge capabilities directly into LangGraph <code class="inline">StateGraph</code> nodes with autonomous fallback for capability gaps:</p>
+        <p>Integrate CapForge capabilities directly into LangGraph <code class="inline">StateGraph</code> workflows with automated self-healing and capability evolution fallback:</p>
 
         <div class="code-box">
           <div class="code-header">
@@ -948,28 +1126,28 @@ with CapForgeClient() as client:
           <div class="code-pane active">
             <pre><code>from typing import TypedDict
 from langgraph.graph import StateGraph, END
-from capforge import CapForgeClient
-from capforge.runtime.agent_adapter import LangGraphAdapter
+from capforge import CapForgeClient, LangGraphAdapter
 
 class AgentState(TypedDict):
     task: str
     tool_inputs: dict
-    result: dict
+    result: dict | None
+    error: str | None
 
 client = CapForgeClient()
 adapter = LangGraphAdapter(client)
 
-# Create a dynamic CapForge execution node
+# 1. Create a dynamic CapForge execution node for a registered tool
 tool_node = adapter.create_langgraph_node("monte_carlo_var")
 
-# Create autonomous evolution fallback node (synthesizes new capabilities on demand)
+# 2. Create an autonomous evolution fallback node (synthesizes new capabilities if missing)
 evolution_node = adapter.create_evolution_node()
 
 workflow = StateGraph(AgentState)
 workflow.add_node("execute_tool", tool_node)
 workflow.add_node("evolve_capability", evolution_node)
 
-# Route to evolution node if capability is missing
+# Route to evolution node if capability is not found, else END
 workflow.set_entry_point("execute_tool")
 workflow.add_conditional_edges(
     "execute_tool",
@@ -986,7 +1164,7 @@ app = workflow.compile()</code></pre>
       <section class="doc-section" id="crewai">
         <div class="eyebrow">Developer Guides</div>
         <h2>CrewAI Integration</h2>
-        <p>Equip CrewAI agents with CapForge tools dynamically:</p>
+        <p>Equip CrewAI agents with CapForge tools dynamically via <code class="inline">client.to_crewai_tool()</code> or the dedicated <code class="inline">CrewAIAgentAdapter</code>:</p>
 
         <div class="code-box">
           <div class="code-header">
@@ -994,11 +1172,15 @@ app = workflow.compile()</code></pre>
           </div>
           <div class="code-pane active">
             <pre><code>from crewai import Agent, Task, Crew
-from capforge import CapForgeClient
+from capforge import CapForgeClient, CrewAIAgentAdapter
 
 with CapForgeClient() as client:
-    # Convert any CapForge capability into a native CrewAI tool
+    # Option A: Convert a single CapForge capability into a native CrewAI tool
     var_tool = client.to_crewai_tool("monte_carlo_var")
+
+    # Option B: Use CrewAIAgentAdapter to load all active tools in a namespace
+    adapter = CrewAIAgentAdapter(registry=client.registry)
+    all_finance_tools = adapter.get_crewai_tools(namespace="finance")
 
     risk_officer = Agent(
         role="Chief Risk Officer",
@@ -1024,7 +1206,7 @@ with CapForgeClient() as client:
       <section class="doc-section" id="openai">
         <div class="eyebrow">Developer Guides</div>
         <h2>OpenAI &amp; Anthropic Tool Calling</h2>
-        <p>Export formal JSON Schemas directly to OpenAI Assistants and Anthropic Claude:</p>
+        <p>Export formal JSON Schemas directly to OpenAI Assistants and Anthropic Claude, and execute tool calls inside the CapForge isolated sandbox:</p>
 
         <div class="code-box">
           <div class="code-header">
@@ -1037,7 +1219,7 @@ from capforge import CapForgeClient
 cap_client = CapForgeClient()
 openai_client = OpenAI()
 
-# Export all active capabilities as OpenAI tools
+# 1. Export active capabilities directly as OpenAI tools
 tools = [cap_client.to_openai_tool("sentiment_analyzer")]
 
 response = openai_client.chat.completions.create(
@@ -1047,10 +1229,10 @@ response = openai_client.chat.completions.create(
     tool_choice="auto"
 )
 
-# Execute chosen tool safely inside CapForge sandbox
+# 2. Execute chosen tool safely inside CapForge sandbox
 tool_call = response.choices[0].message.tool_calls[0]
 execution_res = cap_client.handle_openai_tool_call(tool_call)
-print("Execution Result:", execution_res)</code></pre>
+print("Execution Result Message:", execution_res)</code></pre>
           </div>
         </div>
       </section>
@@ -1146,19 +1328,22 @@ capforge serve --port 8000
           <div class="code-pane active">
             <pre><code>from capforge.optimization.profiler import RuntimeProfiler
 
-profiler = RuntimeProfiler(target_p95_ms=25.0)
+# Initialize profiler with default SLA threshold (e.g. 25.0 ms max P95)
+profiler = RuntimeProfiler(default_latency_sla_ms=25.0, min_samples_before_audit=5)
+profiler.set_sla("monte_carlo_var", max_p95_ms=25.0)
 
 # Record telemetry samples from live execution
 for sample in latency_samples:
     profiler.record_execution(
         capability_id="monte_carlo_var",
         version="1.0.0",
-        duration_ms=sample
+        duration_ms=sample,
+        success=True
     )
 
-# Check for SLA violations
-gap = profiler.check_optimization_gap("monte_carlo_var", "1.0.0")
-if gap:
+# Analyze profiles and detect SLA violations
+gaps = profiler.detect_optimization_gaps()
+for gap in gaps:
     print(f"Optimization Gap Detected: {gap.reason}")
     print(f"P95 Latency: {gap.p95_latency_ms:.2f}ms (Target: {gap.target_p95_ms:.2f}ms)")
     print(f"Recommended Action: {gap.suggested_action}")  # 'JIT_COMPILE_RUST_C'</code></pre>
@@ -1495,6 +1680,24 @@ volumes:
           <div class="callout-content">
             <strong>How does CapForge prevent regressions during upgrades?</strong>
             <p>Level 4 verification runs the complete historical regression test suite against any proposed version upgrade. If even a single test fails, the upgrade is blocked and automatically rolled back.</p>
+          </div>
+        </div>
+        <div class="callout tip">
+          <div class="callout-content">
+            <strong>How do I migrate my existing agent tools into CapForge without rewriting them?</strong>
+            <p>You do not need to rewrite your code. Simply decorate existing functions with <code class="inline">@capability</code>, or call <code class="inline">client.register_function(my_func, id="tool_name", promote=True)</code>. CapForge inspects Python type signatures and docstrings to automatically generate parameter contracts and index them in semantic memory.</p>
+          </div>
+        </div>
+        <div class="callout tip">
+          <div class="callout-content">
+            <strong>How do multiple agents share capabilities without database lock contention?</strong>
+            <p>CapForge enables SQLite Write-Ahead Logging (<code class="inline">PRAGMA journal_mode=WAL;</code>) by default, allowing concurrent non-blocking readers across any number of agent threads or processes. For multi-node distributed agent clusters, set <code class="inline">CAPFORGE_DATABASE_URL=postgresql://...</code> to connect to a high-concurrency PostgreSQL cluster.</p>
+          </div>
+        </div>
+        <div class="callout tip">
+          <div class="callout-content">
+            <strong>Can CapForge run fully offline with local LLMs (e.g. Ollama)?</strong>
+            <p>Yes. Set <code class="inline">CAPFORGE_LLM_PROVIDER=ollama</code> and <code class="inline">CAPFORGE_LLM_MODEL=qwen2.5:7b</code> in your environment. CapForge will execute gap synthesis and self-repair reflection queries directly through your local Ollama daemon on <code class="inline">http://localhost:11434</code> with zero external network dependencies.</p>
           </div>
         </div>
       </section>

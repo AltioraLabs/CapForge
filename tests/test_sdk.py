@@ -175,3 +175,50 @@ def execute(cmd: str):
         with pytest.raises(SecurityError) as exc_info:
             client.register(bad_cap)
         assert "Security scan blocked" in str(exc_info.value)
+
+
+def test_sdk_tool_bridges_and_langgraph(tmp_path):
+    """CapForgeClient provides convenient to_openai_tool, handle_openai_tool_call, to_crewai_tool, and LangGraphAdapter."""
+    from capforge import LangGraphAdapter
+
+    db_file = tmp_path / "bridge_test.db"
+
+    @capability(id="adder", domain="math")
+    def adder(x: int = 1, y: int = 2) -> dict:
+        return {"sum": x + y}
+
+    with CapForgeClient(db_path=db_file, enable_security_scan=False, auto_evaluate=False) as client:
+        client.register(adder, promote=True)
+
+        # 1. to_openai_tool & handle_openai_tool_call
+        openai_tool = client.to_openai_tool("adder")
+        assert openai_tool["type"] == "function"
+        assert openai_tool["function"]["name"] == "adder"
+
+        mock_call = {
+            "id": "call_123",
+            "function": {"name": "adder", "arguments": '{"x": 10, "y": 20}'}
+        }
+        res_msg = client.handle_openai_tool_call(mock_call)
+        assert res_msg["role"] == "tool"
+        assert res_msg["tool_call_id"] == "call_123"
+        assert '"sum": 30' in res_msg["content"]
+
+        # 2. to_crewai_tool
+        crew_tool = client.to_crewai_tool("adder")
+        assert crew_tool.name == "adder"
+        out = crew_tool.run(x=5, y=7)
+        assert out == {"sum": 12}
+
+        # 3. batch_execute alias
+        batch_res = client.batch_execute([{"capability_id": "adder", "inputs": {"x": 2, "y": 3}}])
+        assert len(batch_res) == 1
+        assert batch_res[0].output == {"sum": 5}
+
+        # 4. LangGraphAdapter
+        lg_adapter = LangGraphAdapter(client)
+        node_fn = lg_adapter.create_langgraph_node("adder")
+        state_out = node_fn({"tool_inputs": {"x": 40, "y": 2}})
+        assert state_out["result"] == {"sum": 42}
+        assert state_out["error"] is None
+

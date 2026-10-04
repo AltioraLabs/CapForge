@@ -345,6 +345,12 @@ class ExecutionResponse(BaseModel):
     execution_time_ms: float
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
+    @property
+    def latency_ms(self) -> float:
+        """Alias for execution_time_ms."""
+        return self.execution_time_ms
+
+
 
 # ---------------------------------------------------------------------------
 # Universal Event Model (discussion.mdx §9)

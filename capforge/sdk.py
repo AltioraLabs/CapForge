@@ -597,6 +597,46 @@ class CapForgeClient:
             raise ValueError(f"Capability '{capability_id}' not found.")
         return cap.to_tool()
 
+    def to_openai_tool(self, cap_or_id: str | Capability) -> dict[str, Any]:
+        """Export a capability as an OpenAI function calling tool definition."""
+        from capforge.adapter.openai_adapter import OpenAIAgentAdapter
+
+        cap = cap_or_id if isinstance(cap_or_id, Capability) else self.get(cap_or_id)
+        if not cap:
+            raise ValueError(f"Capability '{cap_or_id}' not found.")
+        adapter = OpenAIAgentAdapter(registry=self.registry)
+        return adapter.to_openai_tool(cap)
+
+    def handle_openai_tool_call(self, tool_call: dict[str, Any] | Any) -> dict[str, Any]:
+        """Execute an OpenAI tool call dictionary and format response message."""
+        from capforge.adapter.openai_adapter import OpenAIAgentAdapter
+
+        adapter = OpenAIAgentAdapter(registry=self.registry)
+        payload = (
+            tool_call.model_dump()
+            if hasattr(tool_call, "model_dump")
+            else (tool_call.dict() if hasattr(tool_call, "dict") else tool_call)
+        )
+        return adapter.handle_tool_call(payload)
+
+    def to_crewai_tool(self, cap_or_id: str | Capability) -> Any:
+        """Wrap a capability as a CrewAI-compatible tool."""
+        from capforge.adapter.crewai_adapter import CrewAIAgentAdapter
+
+        cap = cap_or_id if isinstance(cap_or_id, Capability) else self.get(cap_or_id)
+        if not cap:
+            raise ValueError(f"Capability '{cap_or_id}' not found.")
+        adapter = CrewAIAgentAdapter(registry=self.registry)
+        return adapter.to_crewai_tool(cap)
+
+    def batch_execute(
+        self,
+        requests: list[dict[str, Any] | ExecutionRequest],
+        **kwargs: Any,
+    ) -> list[ExecutionResponse]:
+        """Convenience alias for execute_batch."""
+        return self.execute_batch(requests)
+
     def subscribe_webhook(
         self,
         url: str,

@@ -211,3 +211,55 @@ class CapForgeAgent:
             )
 
         return trace
+
+
+class LangGraphAdapter:
+    """Bridge for integrating CapForge capabilities into LangGraph StateGraphs."""
+
+    def __init__(self, client: Any | None = None, capforge_agent: CapForgeAgent | None = None):
+        if capforge_agent is not None:
+            self.agent = capforge_agent
+            self.client = client
+        elif client is not None and hasattr(client, "agent"):
+            self.agent = client.agent
+            self.client = client
+        else:
+            self.agent = CapForgeAgent()
+            self.client = None
+
+    def create_langgraph_node(self, capability_id: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
+        """Create a stateful node callable compatible with LangGraph StateGraph."""
+        agent = self.agent
+
+        def tool_node(state: dict[str, Any]) -> dict[str, Any]:
+            inputs = state.get("tool_inputs") or state.get("inputs") or {}
+            cap = agent.registry.get(capability_id)
+            if not cap:
+                return {**state, "error": "CAPABILITY_NOT_FOUND", "missing_capability": capability_id}
+            req = ExecutionRequest(capability_id=capability_id, inputs=inputs)
+            res = agent.executor.execute(req)
+            if res.status != "SUCCESS":
+                return {**state, "error": res.error or "EXECUTION_FAILED", "result": None}
+            return {**state, "result": res.output, "error": None}
+
+        return tool_node
+
+    def create_evolution_node(self) -> Callable[[dict[str, Any]], dict[str, Any]]:
+        """Create an autonomous evolution fallback node for LangGraph StateGraph."""
+        agent = self.agent
+
+        def evolution_node(state: dict[str, Any]) -> dict[str, Any]:
+            task_intent = state.get("task") or state.get("task_intent") or state.get("missing_capability") or "unknown_task"
+            inputs = state.get("tool_inputs") or state.get("inputs") or {}
+            trace = agent.handle_task(task_intent=task_intent, task_inputs=inputs)
+            if trace.execution_result and trace.execution_result.status == "SUCCESS":
+                return {
+                    **state,
+                    "result": trace.execution_result.output,
+                    "error": None,
+                    "evolved_capability": trace.acquired_capability.id if trace.acquired_capability else None,
+                }
+            return {**state, "error": "EVOLUTION_FAILED", "result": None}
+
+        return evolution_node
+
