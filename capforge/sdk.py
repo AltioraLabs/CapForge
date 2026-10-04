@@ -43,7 +43,6 @@ from capforge.core.models import (
     ExecutionRequest,
     ExecutionResponse,
     ParameterSpec,
-    PromotionMode,
     PromotionPolicy,
     RiskLevel,
     TestCase,

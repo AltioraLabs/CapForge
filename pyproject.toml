@@ -58,6 +58,7 @@ addopts = "-ra -q --import-mode=importlib"
 testpaths = [
     "tests"
 ]
+pythonpath = ["."]
 asyncio_mode = "auto"
 
 [tool.ruff]
@@ -79,8 +80,10 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["capforge"]
+known-first-party = ["capforge", "benchmarks"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/__init__.py" = ["F401", "RUF022"]
 "capforge/verification/sandbox.py" = ["S102"]
+"benchmarks/*" = ["E402"]
+"tests/test_benchmarks.py" = ["E402"]

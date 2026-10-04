@@ -1,19 +1,15 @@
 """Tests for CapForge Asynchronous Synthesis Path (Priority 1)."""
 
 import time
-import pytest
 
 from capforge import CapForgeClient
 from capforge.core.models import (
-    CapabilityGap,
     CapabilityStatus,
     PromotionMode,
     PromotionPolicy,
-    RiskLevel,
 )
 from capforge.runtime.agent_adapter import CapForgeAgent
 from capforge.runtime.async_synthesis import (
-    AsyncSynthesisJob,
     AsyncSynthesisManager,
     SynthesisFallbackResponse,
     SynthesisPhase,

@@ -9,6 +9,7 @@ Integrates the Event Gateway, Experience Filter, Risk Engine, and Capability Gra
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel, Field

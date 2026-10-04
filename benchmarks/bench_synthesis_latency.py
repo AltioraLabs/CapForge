@@ -12,7 +12,6 @@ breaking down exact phase timings:
 from __future__ import annotations
 
 import logging
-import statistics
 import time
 from typing import Any
 
@@ -23,7 +22,6 @@ from benchmarks.stats import compute_stats
 from capforge.core.models import PromotionMode, PromotionPolicy
 from capforge.runtime.agent_adapter import CapForgeAgent
 from capforge.runtime.async_synthesis import AsyncSynthesisManager, SynthesisPhase
-
 
 # ---------------------------------------------------------------------------
 # Realistic Multi-Domain Capability Specifications

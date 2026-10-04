@@ -5,7 +5,12 @@ Ensures benchmark harnesses run reliably in CI/CD without crashes or false posit
 
 from __future__ import annotations
 
-import pytest
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from benchmarks.bench_execution_overhead import run_benchmark as run_overhead
 from benchmarks.bench_pyo3_speedup import run_benchmark as run_pyo3

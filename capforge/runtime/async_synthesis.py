@@ -28,7 +28,6 @@ from pydantic import BaseModel, Field
 
 from capforge.core.models import (
     AgentEvent,
-    Capability,
     CapabilityGap,
     CapabilityStatus,
     EventType,

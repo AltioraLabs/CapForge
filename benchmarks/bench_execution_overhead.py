@@ -77,7 +77,6 @@ def raw_structured_task(records: list[dict] | None = None) -> dict:
     domain="benchmark",
 )
 def numerical_task(spot: float = 100.0, strike: float = 100.0, rate: float = 0.05, vol: float = 0.2, expiry: float = 1.0) -> dict:
-    import math
 
     d1 = (math.log(spot / strike) + (rate + 0.5 * vol * vol) * expiry) / (vol * math.sqrt(expiry))
     d2 = d1 - vol * math.sqrt(expiry)
@@ -89,7 +88,6 @@ def numerical_task(spot: float = 100.0, strike: float = 100.0, rate: float = 0.0
 
 
 def raw_numerical_task(spot: float = 100.0, strike: float = 100.0, rate: float = 0.05, vol: float = 0.2, expiry: float = 1.0) -> dict:
-    import math
 
     d1 = (math.log(spot / strike) + (rate + 0.5 * vol * vol) * expiry) / (vol * math.sqrt(expiry))
     d2 = d1 - vol * math.sqrt(expiry)

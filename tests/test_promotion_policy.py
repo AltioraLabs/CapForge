@@ -1,6 +1,5 @@
 """Tests for CapForge Promotion Policy & Governance Gates (Priority 2)."""
 
-import pytest
 
 from capforge import CapForgeClient
 from capforge.core.governance import HumanReviewTicket, RiskEngine

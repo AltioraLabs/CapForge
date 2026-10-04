@@ -1,6 +1,5 @@
 """Tests for CapForge Seed Subsystem & Domain Pre-warming (Priority 4)."""
 
-import pytest
 
 from capforge import CapForgeClient
 from capforge.core.models import CapabilityStatus
