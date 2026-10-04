@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # Core models are imported eagerly — they are pure data classes with no side effects
 from capforge.core.models import (
