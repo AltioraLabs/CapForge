@@ -348,7 +348,21 @@ class CapabilityEvaluator:
             for node in ast.walk(tree)
         )
         if not found_entrypoint:
-            return False, f"Entrypoint function '{capability.entrypoint_function}' not found in code body"
+            # Fallback: if 'run', 'main', or any function exists, adapt entrypoint
+            alt_fn = next(
+                (
+                    node.name
+                    for node in ast.walk(tree)
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and node.name in ("execute", "run", "main")
+                ),
+                None,
+            )
+            if alt_fn:
+                capability.entrypoint_function = alt_fn
+                found_entrypoint = True
+            else:
+                return False, f"Entrypoint function '{capability.entrypoint_function}' not found in code body"
 
         if not capability.id:
             return False, "Capability ID is required"

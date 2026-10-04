@@ -16,6 +16,8 @@ from pydantic import BaseModel, Field
 from capforge.core.models import (
     Capability,
     ExecutionRequest,
+    PromotionMode,
+    PromotionPolicy,
     RiskLevel,
 )
 
@@ -240,6 +242,56 @@ class RiskEngine:
             requires_human_approval=(level == RiskLevel.HIGH),
             auto_promote_allowed=(level == RiskLevel.LOW),
         )
+
+    def evaluate_promotion(
+        self,
+        capability: Capability,
+        policy: PromotionPolicy | None = None,
+    ) -> tuple[bool, RiskAssessment, HumanReviewTicket | None]:
+        """Evaluate whether a capability can be promoted according to policy.
+
+        Returns:
+            (can_promote, assessment, ticket_if_created)
+        """
+        policy = policy or PromotionPolicy()
+        assessment = self.assess(capability)
+
+        risk_order = {RiskLevel.LOW: 0, RiskLevel.MEDIUM: 1, RiskLevel.HIGH: 2}
+        cap_risk = risk_order.get(assessment.risk_level, 2)
+        threshold_risk = risk_order.get(policy.risk_threshold, 0)
+
+        can_promote = False
+        if policy.mode == PromotionMode.AUTO:
+            can_promote = True
+        elif policy.mode == PromotionMode.AUTO_LOW_RISK:
+            can_promote = cap_risk <= threshold_risk
+        elif policy.mode == PromotionMode.HUMAN_REVIEW:
+            can_promote = False
+
+        ticket: HumanReviewTicket | None = None
+        if not can_promote:
+            existing = [
+                t
+                for t in self.review_tickets
+                if t.capability_id == capability.id and t.status == "PENDING"
+            ]
+            if existing:
+                ticket = existing[0]
+            else:
+                ticket = HumanReviewTicket(
+                    capability_id=capability.id,
+                    version=capability.version,
+                    risk_level=assessment.risk_level,
+                    escalation_reason=(
+                        f"Promotion policy '{policy.mode.value}' requires review "
+                        f"(risk: {assessment.risk_level.value})"
+                    ),
+                    code_snippet=capability.code_body[:500] if capability.code_body else None,
+                )
+                self.review_tickets.append(ticket)
+
+        return can_promote, assessment, ticket
+
 
 
 # ---------------------------------------------------------------------------

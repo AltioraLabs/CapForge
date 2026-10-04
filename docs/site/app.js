@@ -255,7 +255,12 @@
     { title: 'Enterprise Storage & Deployment', cat: 'Deploy', href: '#deploy', desc: 'PostgreSQL distributed registry, S3/MinIO artifact storage, Redis pub/sub streams' },
     { title: 'OpenTelemetry & Prometheus Metrics', cat: 'Operate', href: '#telemetry', desc: 'GenAI distributed tracing spans, latency histograms, /metrics endpoint' },
     { title: 'REST API Complete Reference', cat: 'API', href: '#rest', desc: 'Interactive endpoint cards: capabilities, execute, verify, optimize, mutate, webhooks' },
-    { title: 'CLI Command Cheatsheet', cat: 'CLI', href: '#cli', desc: 'capforge init, serve, synth, verify, optimize, mcp, audit, health' },
+    { title: 'CLI Command Cheatsheet', cat: 'CLI', href: '#cli', desc: 'capforge init, serve, synth, verify, optimize, mcp, audit, health, seed, synth-status, reviews' },
+    { title: 'Production Readiness & Blocker Mitigations', cat: 'Operate', href: '#production-readiness', desc: 'Async synthesis latency budget, human-in-the-loop promotion policy, cold start pre-warming, and reproducible benchmarks' },
+    { title: 'Non-Blocking Async Synthesis & Fallback', cat: 'Architecture', href: '#production-readiness', desc: 'Non-blocking capability acquisition path returning fallback responses while synthesis and verification run in background' },
+    { title: 'Human-in-the-Loop Promotion Policy', cat: 'Security', href: '#production-readiness', desc: 'Configurable PromotionPolicy (AUTO, AUTO_LOW_RISK, HUMAN_REVIEW) and governance review tickets' },
+    { title: 'Cold Start Pre-Warming (capforge seed)', cat: 'CLI', href: '#production-readiness', desc: 'Pre-populate capability registry with verified baseline domain libraries (finance, devops, nlp, data)' },
+    { title: 'Reproducible Benchmark Suite', cat: 'Bench', href: '#production-readiness', desc: 'Automated benchmark suite measuring sandbox overhead, synthesis latency, PyO3 speedup, and verification throughput' },
     { title: 'Security, Firewall & RBAC', cat: 'Security', href: '#security', desc: 'CodeGuardian OWASP AST rules, SSRF guardian, RBAC roles, audit logs, HMAC trust' },
     { title: 'Troubleshooting & FAQ', cat: 'Guide', href: '#faq', desc: 'Multi-agent migration, database WAL sharing, offline Ollama, Docker fallbacks' },
   ];

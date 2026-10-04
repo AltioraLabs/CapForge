@@ -33,14 +33,18 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from capforge.core.governance import HumanReviewTicket
 from capforge.core.models import (
     Capability,
+    CapabilityGap,
     CapabilityStatus,
     CapabilityType,
     ExecutionMode,
     ExecutionRequest,
     ExecutionResponse,
     ParameterSpec,
+    PromotionMode,
+    PromotionPolicy,
     RiskLevel,
     TestCase,
     TestType,
@@ -54,10 +58,17 @@ from capforge.events.webhooks import (
 )
 from capforge.registry.store import CapabilityRegistry
 from capforge.runtime.agent_adapter import AgentLifecycleTrace, CapForgeAgent
+from capforge.runtime.async_synthesis import (
+    AsyncSynthesisJob,
+    AsyncSynthesisManager,
+    SynthesisFallbackResponse,
+    SynthesisPhase,
+)
 from capforge.runtime.executor import CapabilityExecutor
 from capforge.security.code_guardian import CodeGuardian
 from capforge.security.trust_chain import TrustChain
 from capforge.verification.evaluator import CapabilityEvaluator
+from capforge.verification.sandbox import SandboxRunner
 
 logger = logging.getLogger("capforge.sdk")
 
@@ -77,6 +88,21 @@ _PYTHON_TYPE_MAP: dict[type, str] = {
 def _resolve_type_name(annotation: Any) -> str:
     """Map a Python type annotation to CapForge parameter type string."""
     if annotation is inspect.Parameter.empty:
+        return "string"
+    if isinstance(annotation, str):
+        cleaned = annotation.strip().lower()
+        if cleaned in ("float", "number"):
+            return "number"
+        if cleaned in ("int", "integer"):
+            return "integer"
+        if cleaned in ("bool", "boolean"):
+            return "boolean"
+        if cleaned.startswith(("list", "sequence", "set", "tuple")):
+            return "array"
+        if cleaned.startswith(("dict", "mapping", "object")):
+            return "object"
+        if cleaned in ("str", "string"):
+            return "string"
         return "string"
     origin = getattr(annotation, "__origin__", None)
     if origin is not None:
@@ -129,11 +155,12 @@ def capability(
 
         outputs: dict[str, ParameterSpec] = {}
         return_annotation = sig.return_annotation
-        if return_annotation is not inspect.Signature.empty:
+        if return_annotation is not inspect.Signature.empty and return_annotation is not dict:
             outputs["result"] = ParameterSpec(
                 name="result",
                 type=_resolve_type_name(return_annotation),
                 description="Function return value",
+                required=False,
             )
 
         try:
@@ -236,11 +263,13 @@ class CapForgeClient:
         server_url: str | None = None,
         api_key: str | None = None,
         timeout: float = 30.0,
+        sandbox_driver: str | None = None,
     ):
         self._db_path = Path(db_path) if db_path else None
         self._server_url = server_url.rstrip("/") if server_url else None
         self._api_key = api_key
         self._timeout = timeout
+        self._sandbox_driver = sandbox_driver
         self._enable_trust_chain = enable_trust_chain
         self._enable_security_scan = enable_security_scan
         self._auto_evaluate = auto_evaluate
@@ -292,14 +321,17 @@ class CapForgeClient:
     @property
     def evaluator(self) -> CapabilityEvaluator:
         if self._evaluator is None:
-            self._evaluator = CapabilityEvaluator()
+            sandbox = SandboxRunner(driver=self._sandbox_driver) if self._sandbox_driver else None
+            self._evaluator = CapabilityEvaluator(sandbox=sandbox)
         return self._evaluator
 
     @property
     def executor(self) -> CapabilityExecutor:
         if self._executor is None:
+            sandbox = SandboxRunner(driver=self._sandbox_driver) if self._sandbox_driver else None
             self._executor = CapabilityExecutor(
                 registry=self.registry,
+                sandbox=sandbox,
                 trust_chain=self.trust_chain if self._enable_trust_chain else None,
             )
         return self._executor
@@ -320,6 +352,10 @@ class CapForgeClient:
     @property
     def webhooks(self) -> Any:
         return webhook_manager
+
+    @property
+    def async_manager(self) -> AsyncSynthesisManager:
+        return self.agent.async_manager
 
     def __enter__(self) -> CapForgeClient:
         return self
@@ -463,6 +499,9 @@ class CapForgeClient:
         agent_id: str | None = "default",
         task_inputs: dict[str, Any] | None = None,
         run_id: str | None = None,
+        async_mode: bool = False,
+        promotion_policy: PromotionPolicy | None = None,
+        fallback_output: Any = None,
     ) -> AgentLifecycleTrace:
         resolved_inputs = inputs if inputs is not None else (task_inputs or {})
         return self.agent.handle_task(
@@ -471,6 +510,9 @@ class CapForgeClient:
             knowledge_spec=knowledge_spec,
             agent_id=agent_id,
             run_id=run_id,
+            async_mode=async_mode,
+            promotion_policy=promotion_policy,
+            fallback_output=fallback_output,
         )
 
     def get(self, capability_id: str, version: str | None = None) -> Capability | None:
@@ -636,6 +678,129 @@ class CapForgeClient:
     ) -> list[ExecutionResponse]:
         """Convenience alias for execute_batch."""
         return self.execute_batch(requests)
+
+    def synthesize_async(
+        self,
+        task_intent: str,
+        *,
+        gap: CapabilityGap | None = None,
+        knowledge_spec: dict[str, Any] | None = None,
+        promotion_policy: PromotionPolicy | None = None,
+        fallback_output: Any = None,
+    ) -> SynthesisFallbackResponse:
+        """Queue capability synthesis in the background and return a fallback immediately."""
+        if self.is_remote:
+            client = self._get_http_client()
+            payload: dict[str, Any] = {
+                "task_intent": task_intent,
+                "gap": gap.model_dump(mode="json") if gap else None,
+                "knowledge_spec": knowledge_spec,
+                "fallback_output": fallback_output,
+            }
+            if promotion_policy:
+                payload["promotion_policy"] = promotion_policy.model_dump(mode="json")
+            resp = client.post("/v1/synthesis/async", json=payload)
+            resp.raise_for_status()
+            return SynthesisFallbackResponse.model_validate(resp.json())
+
+        return self.async_manager.submit_synthesis(
+            task_intent=task_intent,
+            gap=gap,
+            knowledge_spec=knowledge_spec,
+            promotion_policy=promotion_policy,
+            fallback_output=fallback_output,
+        )
+
+    def poll_synthesis(self, job_id: str) -> AsyncSynthesisJob | None:
+        """Poll the status and progress of an asynchronous synthesis job."""
+        if self.is_remote:
+            client = self._get_http_client()
+            resp = client.get(f"/v1/synthesis/{job_id}")
+            if resp.status_code == 404:
+                return None
+            resp.raise_for_status()
+            return AsyncSynthesisJob.model_validate(resp.json())
+
+        return self.async_manager.get_job(job_id)
+
+    def list_synthesis_jobs(
+        self,
+        phase: SynthesisPhase | str | None = None,
+        limit: int = 50,
+    ) -> list[AsyncSynthesisJob]:
+        """List ongoing or completed asynchronous synthesis jobs."""
+        if self.is_remote:
+            client = self._get_http_client()
+            params: dict[str, Any] = {"limit": limit}
+            if phase:
+                params["phase"] = phase.value if hasattr(phase, "value") else str(phase)
+            resp = client.get("/v1/synthesis/jobs", params=params)
+            resp.raise_for_status()
+            return [AsyncSynthesisJob.model_validate(j) for j in resp.json()]
+
+        phase_enum = SynthesisPhase(str(phase)) if phase else None
+        return self.async_manager.list_jobs(phase=phase_enum, limit=limit)
+
+    def set_promotion_policy(self, policy: PromotionPolicy) -> None:
+        """Configure the promotion policy for newly acquired capabilities."""
+        self.agent.async_manager._default_policy = policy
+
+    def list_pending_reviews(self, status: str = "PENDING") -> list[HumanReviewTicket]:
+        """List capabilities waiting in the governance review queue."""
+        if self.is_remote:
+            client = self._get_http_client()
+            resp = client.get(f"/v1/governance/reviews?status={status}")
+            resp.raise_for_status()
+            return [HumanReviewTicket.model_validate(t) for t in resp.json()]
+
+        return self.agent.risk_engine.list_tickets(status=status)
+
+    def approve_capability(
+        self,
+        ticket_id: str,
+        reviewer: str = "security_lead",
+        notes: str = "Approved by human governor",
+    ) -> HumanReviewTicket:
+        """Approve a capability pending human review and promote it to ACTIVE."""
+        if self.is_remote:
+            client = self._get_http_client()
+            resp = client.post(
+                f"/v1/governance/reviews/{ticket_id}/approve",
+                json={"reviewer": reviewer, "notes": notes},
+            )
+            resp.raise_for_status()
+            return HumanReviewTicket.model_validate(resp.json())
+
+        ticket = self.agent.risk_engine.approve_ticket(ticket_id, reviewer=reviewer, notes=notes)
+        cap = self.registry.get(ticket.capability_id)
+        if cap:
+            cap.status = CapabilityStatus.ACTIVE
+            self.registry.register(cap)
+            self.agent.capability_graph.add_capability(cap)
+        return ticket
+
+    def reject_capability(
+        self,
+        ticket_id: str,
+        reviewer: str = "security_lead",
+        notes: str = "Rejected by human governor",
+    ) -> HumanReviewTicket:
+        """Reject a capability pending human review, marking it QUARANTINED."""
+        if self.is_remote:
+            client = self._get_http_client()
+            resp = client.post(
+                f"/v1/governance/reviews/{ticket_id}/reject",
+                json={"reviewer": reviewer, "notes": notes},
+            )
+            resp.raise_for_status()
+            return HumanReviewTicket.model_validate(resp.json())
+
+        ticket = self.agent.risk_engine.reject_ticket(ticket_id, reviewer=reviewer, notes=notes)
+        cap = self.registry.get(ticket.capability_id)
+        if cap:
+            cap.status = CapabilityStatus.QUARANTINED
+            self.registry.register(cap)
+        return ticket
 
     def subscribe_webhook(
         self,

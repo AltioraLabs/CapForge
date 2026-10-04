@@ -22,11 +22,13 @@ from pydantic import BaseModel, Field, field_validator
 
 class CapabilityStatus(str, enum.Enum):
     EXPERIMENTAL = "EXPERIMENTAL"
+    DRAFT = "DRAFT"
     CANDIDATE = "CANDIDATE"
     ACTIVE = "ACTIVE"
     PRODUCTION = "PRODUCTION"
     DEPRECATED = "DEPRECATED"
     QUARANTINED = "QUARANTINED"
+    PENDING_REVIEW = "PENDING_REVIEW"
 
 
 class CapabilityType(str, enum.Enum):
@@ -63,6 +65,33 @@ class RiskLevel(str, enum.Enum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
+
+
+class PromotionMode(str, enum.Enum):
+    """Promotion policy modes for synthesized capabilities."""
+
+    AUTO = "auto"
+    HUMAN_REVIEW = "human_review"
+    AUTO_LOW_RISK = "auto_low_risk"
+
+
+class PromotionPolicy(BaseModel):
+    """Configurable promotion gate for synthesized capabilities.
+
+    Controls whether a newly verified capability auto-promotes to ACTIVE
+    or enters a PENDING_REVIEW queue requiring human approval.
+    """
+
+    mode: PromotionMode = PromotionMode.AUTO_LOW_RISK
+    risk_threshold: RiskLevel = RiskLevel.LOW
+    notify: list[str] = Field(
+        default_factory=list,
+        description="Notification channels (e.g. 'slack://eng-channel', 'webhook://url')",
+    )
+    require_full_verification: bool = Field(
+        default=True,
+        description="If False, capabilities passing L0+L1 can serve as DRAFT before full L2-L5 completes.",
+    )
 
 
 class EventType(str, enum.Enum):

@@ -14,6 +14,8 @@ from capforge.core.models import (
     EventType,
     ExecutionRequest,
     ExecutionResponse,
+    PromotionMode,
+    PromotionPolicy,
     Provenance,
     RiskLevel,
     TestCase,
@@ -70,9 +72,13 @@ _LAZY_IMPORTS = {
     "DockerSandboxRunner": "capforge.verification.sandbox_docker",
     # Versioning
     "VersionManager": "capforge.versioning.manager",
-    # Runtime
+    # Runtime & Async Synthesis
     "CapForgeAgent": "capforge.runtime.agent_adapter",
     "LangGraphAdapter": "capforge.runtime.agent_adapter",
+    "AsyncSynthesisManager": "capforge.runtime.async_synthesis",
+    "AsyncSynthesisJob": "capforge.runtime.async_synthesis",
+    "SynthesisFallbackResponse": "capforge.runtime.async_synthesis",
+    "SynthesisPhase": "capforge.runtime.async_synthesis",
     "CapabilityPipeline": "capforge.runtime.pipeline",
     "CapabilityPipelineRunner": "capforge.runtime.pipeline",
     "PipelineExecutionResponse": "capforge.runtime.pipeline",

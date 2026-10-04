@@ -605,5 +605,174 @@ def remove_webhook(
         console.print(f"[red]Webhook {webhook_id} not found[/red]")
 
 
+@app.command("synth-status")
+def synth_status(
+    job_id: str = typer.Option(None, "--job-id", "-j", help="Optional job ID to inspect specifically"),
+    phase: str = typer.Option(None, "--phase", "-p", help="Filter jobs by phase"),
+    limit: int = typer.Option(20, "--limit", "-n", help="Max jobs to display"),
+):
+    """Inspect asynchronous capability synthesis jobs and background pipeline progress."""
+    from capforge.runtime.async_synthesis import AsyncSynthesisManager, SynthesisPhase
+
+    mgr = AsyncSynthesisManager()
+    if job_id:
+        job = mgr.get_job(job_id)
+        if not job:
+            console.print(f"[red]Synthesis job '{job_id}' not found.[/red]")
+            return
+        table = Table(title=f"Async Synthesis Job: {job.job_id}", show_header=False)
+        table.add_column("Property", style="bold cyan")
+        table.add_column("Value")
+        table.add_row("Task Intent", job.task_intent)
+        table.add_row("Phase", f"[bold yellow]{job.phase.value}[/bold yellow]")
+        table.add_row("Progress", f"{job.progress_pct}%")
+        table.add_row("Capability ID", job.capability_id or "synthesizing...")
+        table.add_row("Version", job.version or "-")
+        table.add_row("Draft Available", "[green]YES[/green]" if job.draft_available else "NO")
+        table.add_row("Fully Verified", "[green]YES[/green]" if job.fully_verified else "NO")
+        table.add_row("Risk Level", job.risk_level or "assessing...")
+        table.add_row("Timings (ms)", str(job.phase_timings))
+        if job.error:
+            table.add_row("Error", f"[red]{job.error}[/red]")
+        console.print(table)
+        return
+
+    phase_enum = SynthesisPhase(phase) if phase else None
+    jobs = mgr.list_jobs(phase=phase_enum, limit=limit)
+    if not jobs:
+        console.print("[yellow]No asynchronous synthesis jobs found.[/yellow]")
+        return
+
+    table = Table(title="Async Synthesis Queue & History", show_header=True)
+    table.add_column("Job ID", style="cyan")
+    table.add_column("Intent", style="white")
+    table.add_column("Phase", style="bold yellow")
+    table.add_column("Progress", justify="right")
+    table.add_column("Capability", style="green")
+    table.add_column("Draft", justify="center")
+    table.add_column("Verified", justify="center")
+
+    for j in jobs:
+        table.add_row(
+            j.job_id,
+            j.task_intent[:35],
+            j.phase.value,
+            f"{j.progress_pct}%",
+            j.capability_id or "-",
+            "[green]✓[/green]" if j.draft_available else "-",
+            "[green]✓[/green]" if j.fully_verified else "-",
+        )
+    console.print(table)
+
+
+@app.command("reviews-list")
+def list_reviews(
+    status: str = typer.Option("PENDING", "--status", "-s", help="Filter by status: PENDING, APPROVED, REJECTED"),
+):
+    """List capabilities pending human governance review."""
+    from capforge.core.governance import RiskEngine
+
+    engine = RiskEngine()
+    tickets = engine.list_tickets(status=status)
+    if not tickets:
+        console.print(f"[yellow]No {status} review tickets found.[/yellow]")
+        return
+
+    table = Table(title=f"CapForge Governance Review Queue ({status.upper()})", show_header=True)
+    table.add_column("Ticket ID", style="cyan")
+    table.add_column("Capability ID", style="green")
+    table.add_column("Version")
+    table.add_column("Risk Level", style="bold red")
+    table.add_column("Reason", style="white")
+    table.add_column("Created At", style="dim")
+
+    for t in tickets:
+        table.add_row(
+            t.ticket_id,
+            t.capability_id,
+            t.version,
+            t.risk_level.value,
+            t.escalation_reason[:50],
+            str(t.created_at)[:19],
+        )
+    console.print(table)
+
+
+@app.command("reviews-approve")
+def approve_review(
+    ticket_id: str = typer.Argument(..., help="Review ticket ID to approve"),
+    reviewer: str = typer.Option("security_lead", "--reviewer", "-r", help="Name/handle of reviewer"),
+    notes: str = typer.Option("Approved by human governor", "--notes", "-n", help="Audit review notes"),
+):
+    """Approve a pending capability review ticket and promote it to ACTIVE."""
+    from capforge.core.governance import RiskEngine
+    from capforge.registry.store import CapabilityRegistry
+
+    registry = CapabilityRegistry()
+    engine = RiskEngine()
+    try:
+        ticket = engine.approve_ticket(ticket_id, reviewer=reviewer, notes=notes)
+        cap = registry.get(ticket.capability_id)
+        if cap:
+            cap.status = CapabilityStatus.ACTIVE
+            registry.register(cap)
+        console.print(f"[bold green]Ticket {ticket_id} approved for capability '{ticket.capability_id}'. Promoted to ACTIVE.[/bold green]")
+    except KeyError as exc:
+        console.print(f"[red]{exc}[/red]")
+
+
+@app.command("reviews-reject")
+def reject_review(
+    ticket_id: str = typer.Argument(..., help="Review ticket ID to reject"),
+    reviewer: str = typer.Option("security_lead", "--reviewer", "-r", help="Name/handle of reviewer"),
+    notes: str = typer.Option("Rejected by human governor", "--notes", "-n", help="Audit rejection notes"),
+):
+    """Reject a pending capability review ticket, quarantining the capability."""
+    from capforge.core.governance import RiskEngine
+    from capforge.registry.store import CapabilityRegistry
+
+    registry = CapabilityRegistry()
+    engine = RiskEngine()
+    try:
+        ticket = engine.reject_ticket(ticket_id, reviewer=reviewer, notes=notes)
+        cap = registry.get(ticket.capability_id)
+        if cap:
+            cap.status = CapabilityStatus.QUARANTINED
+            registry.register(cap)
+        console.print(f"[bold red]Ticket {ticket_id} rejected for capability '{ticket.capability_id}'. Marked QUARANTINED.[/bold red]")
+    except KeyError as exc:
+        console.print(f"[red]{exc}[/red]")
+
+
+@app.command("seed")
+def seed_capabilities(
+    domain: str = typer.Option("all", "--domain", "-d", help="Domain to seed: finance, devops, nlp, data, or all"),
+):
+    """Pre-warm the Capability Registry with baseline capabilities for a domain."""
+    from capforge.registry.store import CapabilityRegistry
+    from capforge.seed.domains import get_available_domains, seed_domain
+
+    available = get_available_domains()
+    if domain.lower() not in available and domain.lower() not in ("all", "*"):
+        console.print(f"[red]Unknown domain '{domain}'. Available domains: {', '.join(available)} or 'all'[/red]")
+        return
+
+    registry = CapabilityRegistry()
+    seeded = seed_domain(domain=domain, registry=registry)
+
+    table = Table(title=f"CapForge Seeded Capabilities ({domain.upper()})", show_header=True)
+    table.add_column("Capability ID", style="cyan")
+    table.add_column("Domain", style="magenta")
+    table.add_column("Name", style="white")
+    table.add_column("Status", style="bold green")
+
+    for cap in seeded:
+        table.add_row(cap.id, cap.domain, cap.name, cap.status.value)
+
+    console.print(table)
+    console.print(f"[bold green]Successfully seeded {len(seeded)} capabilities into the Capability Registry.[/bold green]")
+
+
 if __name__ == "__main__":
     app()
+

@@ -20,9 +20,11 @@ from capforge.core.models import (
     AgentEvent,
     Capability,
     CapabilityGap,
+    CapabilityStatus,
     EventType,
     ExecutionRequest,
     ExecutionResponse,
+    PromotionPolicy,
     VerificationResult,
 )
 from capforge.discovery.capability_graph import CapabilityGraph
@@ -47,6 +49,10 @@ class AgentLifecycleTrace(BaseModel):
     reused_primitives: list[str] = Field(default_factory=list)
     risk_level: str | None = None
     firewall_blocked: bool = False
+    async_job_id: str | None = None
+    async_status: str | None = None
+    pending_review: bool = False
+    review_ticket_id: str | None = None
 
 
 class CapForgeAgent:
@@ -66,6 +72,14 @@ class CapForgeAgent:
         self.event_gateway = EventGateway()
         self.experience_filter = ExperienceFilter()
         self.capability_graph = CapabilityGraph(self.registry)
+        self._async_manager = None
+
+    @property
+    def async_manager(self):
+        if self._async_manager is None:
+            from capforge.runtime.async_synthesis import AsyncSynthesisManager
+            self._async_manager = AsyncSynthesisManager(agent=self)
+        return self._async_manager
 
     def handle_task(
         self,
@@ -74,6 +88,9 @@ class CapForgeAgent:
         knowledge_spec: dict[str, Any] | None = None,
         agent_id: str | None = None,
         run_id: str | None = None,
+        async_mode: bool = False,
+        promotion_policy: PromotionPolicy | None = None,
+        fallback_output: Any = None,
     ) -> AgentLifecycleTrace:
         """Execute the full CapForge Capability Lifecycle for an agent task."""
 
@@ -105,6 +122,26 @@ class CapForgeAgent:
                     metadata={"missing": trace.gap.missing_primitives},
                 )
             )
+
+            # If async mode requested, return fallback immediately without blocking
+            if async_mode:
+                fallback_resp = self.async_manager.submit_synthesis(
+                    task_intent=task_intent,
+                    gap=trace.gap,
+                    knowledge_spec=knowledge_spec,
+                    promotion_policy=promotion_policy,
+                    fallback_output=fallback_output,
+                )
+                trace.async_job_id = fallback_resp.job_id
+                trace.async_status = fallback_resp.status
+                trace.execution_result = ExecutionResponse(
+                    capability_id=trace.gap.missing_primitives[0] if trace.gap.missing_primitives else "pending_synthesis",
+                    version="0.0.0",
+                    status="ASYNC_SYNTHESIS_QUEUED",
+                    output=fallback_output,
+                    execution_time_ms=0.0,
+                )
+                return trace
 
             # We must acquire and forge a new capability
             spec = knowledge_spec or {
@@ -146,23 +183,44 @@ class CapForgeAgent:
 
             # Step 3: Risk Assessment & Lifecycle Promotion
             if verif_result.passed:
-                risk = self.risk_engine.assess(repaired_cap)
+                policy = promotion_policy or PromotionPolicy()
+                can_promote, risk, ticket = self.risk_engine.evaluate_promotion(repaired_cap, policy)
                 trace.risk_level = risk.risk_level.value
 
-                verif, _risk = self.version_manager.promote_to_active(repaired_cap, skip_risk_check=True)
-                target_cap_id = repaired_cap.id
+                if can_promote:
+                    verif, _risk = self.version_manager.promote_to_active(repaired_cap, skip_risk_check=True)
+                    target_cap_id = repaired_cap.id
 
-                # Update capability graph
-                self.capability_graph.add_capability(repaired_cap)
+                    # Update capability graph
+                    self.capability_graph.add_capability(repaired_cap)
 
-                self.event_gateway.emit(
-                    AgentEvent(
-                        event_type=EventType.SKILL_PROMOTED,
-                        agent_id=agent_id,
-                        run_id=run_id,
-                        metadata={"capability_id": repaired_cap.id, "version": repaired_cap.version},
+                    self.event_gateway.emit(
+                        AgentEvent(
+                            event_type=EventType.SKILL_PROMOTED,
+                            agent_id=agent_id,
+                            run_id=run_id,
+                            metadata={"capability_id": repaired_cap.id, "version": repaired_cap.version},
+                        )
                     )
-                )
+                else:
+                    repaired_cap.status = CapabilityStatus.PENDING_REVIEW
+                    self.registry.register(repaired_cap)
+                    trace.pending_review = True
+                    trace.review_ticket_id = ticket.ticket_id if ticket else None
+
+                    self.event_gateway.emit(
+                        AgentEvent(
+                            event_type=EventType.SKILL_REJECTED,
+                            agent_id=agent_id,
+                            run_id=run_id,
+                            metadata={
+                                "capability_id": repaired_cap.id,
+                                "status": "PENDING_REVIEW",
+                                "ticket_id": ticket.ticket_id if ticket else None,
+                            },
+                        )
+                    )
+                    return trace
             else:
                 self.event_gateway.emit(
                     AgentEvent(

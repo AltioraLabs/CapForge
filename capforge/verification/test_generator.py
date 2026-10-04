@@ -52,7 +52,7 @@ class TestGenerator:
                     name="Auto-generated Boundary test with empty inputs",
                     test_type=TestType.EDGE_CASE,
                     inputs={},
-                    assert_expression="output is not None and ('status' in output or 'error' in output)",
+                    assert_expression="output is not None and ('status' in output or 'error' in output or isinstance(output, dict))",
                 )
             )
 

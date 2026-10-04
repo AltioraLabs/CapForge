@@ -44,6 +44,20 @@ class AcquisitionEngine:
         # Handle features metadata
         cap.features = list(spec.get("features", []))
 
+        # Handle entrypoint function
+        if "entrypoint_function" in spec:
+            cap.entrypoint_function = spec["entrypoint_function"]
+        elif code_override:
+            try:
+                import ast
+                tree = ast.parse(code_override)
+                for node in ast.walk(tree):
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        cap.entrypoint_function = node.name
+                        break
+            except Exception:
+                pass
+
         # Handle custom inputs specification
         if "inputs" in spec and spec["inputs"]:
             parsed_inputs = {}
