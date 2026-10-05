@@ -1,45 +1,49 @@
 # CapForge Autonomous Runtime Benchmark Report
 
-**Generated:** 2026-10-04T12:42:10.524902+00:00  
+**Generated:** 2026-10-05T19:25:33.522849+00:00  
 **Platform:** Windows (AMD64) | **Python:** 3.11.0rc2  
-**Execution Profile:** quick  
+**Execution Profile:** full  
 
 ## Executive Production SLA Summary
 
 | Benchmark Category | Key Metric Evaluated | CapForge Result | Production SLA Target | Status |
 | :--- | :--- | :---: | :---: | :---: |
-| **Execution Overhead (Guarded)** | In-process firewall + schema + telemetry | **1.32 ms** | < 2,000 µs | **PASS** |
-| **Sandbox Isolation Barrier** | Full OS subprocess boundary (zero-trust) | **141.23 ms** | < 250 ms | **PASS** |
-| **Execution Throughput** | Max sustained calls/sec (in-process) | **667 ops/s** | > 250 ops/s | **PASS** |
-| **Async Fast Check (DRAFT)** | L0 AST + L1 Syntax check (usable early) | **1.8 ms** | < 50 ms | **PASS** |
-| **Full Synthesis (ACTIVE)** | Gap -> 5-Level Verify -> Promotion Gate | **588.3 ms** | < 5,000 ms | **PASS** |
-| **Pre-Warmed Registry Lookup** | Cached capability fetch (cold start resolved) | **15.160 ms** | < 20 ms | **PASS** |
-| **PyO3 JIT Optimization** | Monte Carlo hot-path native acceleration | **11.5x speedup** | > 3.0x | **PASS** |
-| **Verification Throughput** | Full concurrent validation battery | **48,204 caps/min** | > 100 caps/min | **PASS** |
+| **Execution Overhead (Guarded)** | In-process firewall + schema + telemetry | **872.90 µs** | < 2,000 µs | **PASS** |
+| **Sandbox Isolation Barrier** | Full OS subprocess boundary (zero-trust) | **95.80 ms** | < 250 ms | **PASS** |
+| **Execution Throughput** | Max sustained calls/sec (in-process) | **1,036 ops/s** | > 250 ops/s | **PASS** |
+| **Async Fast Check (DRAFT)** | L0 AST + L1 Syntax check (usable early) | **1.6 ms** | < 50 ms | **PASS** |
+| **Full Synthesis (ACTIVE)** | Gap -> 5-Level Verify -> Promotion Gate | **405.9 ms** | < 5,000 ms | **PASS** |
+| **Pre-Warmed Registry Lookup** | Cached capability fetch (cold start resolved) | **19.540 ms** | < 20 ms | **PASS** |
+| **Computational Acceleration** | Monte Carlo hot-path (Vectorized Py) | **8.5x speedup** | > 3.0x | **PASS** |
+| **Verification Throughput** | Full concurrent validation battery | **82,127 caps/min** | > 100 caps/min | **PASS** |
 
 ## Detailed Workload Breakdown
 
 ### 1. Execution Overhead & Sandboxing
-- **In-Process Guarded (Micro Task p50):** 1.32 ms (+1.32 ms vs raw Python)
-- **In-Process Guarded Throughput:** 667 ops/sec
-- **Subprocess Container Boundary (p50):** 141.23 ms (zero-trust OS barrier)
+- **In-Process Guarded (Micro Task p50):** 872.90 µs (+872.70 µs vs raw Python)
+- **In-Process Guarded Throughput:** 1,036 ops/sec
+- **Subprocess Container Boundary (p50):** 95.80 ms (zero-trust OS barrier)
 
 ### 2. Synthesis Latency & Tiered Time Budget
-- **Tier 1: Fast Check (`DRAFT`):** 1.8 ms (AST scan + syntax validation)
-- **Tier 2: Verification (`CANDIDATE`):** 542.5 ms (Docker/subprocess sandbox + boundary fuzzing)
-- **Tier 3: Promotion Gate (`ACTIVE`):** 16.6 ms (RiskEngine + HMAC signature)
-- **Total Cold Synthesis:** 588.3 ms
-- **Pre-Warmed Registry Lookup:** 15.160 ms (cold start eliminated)
+- **Tier 1: Fast Check (`DRAFT`):** 1.6 ms (AST scan + syntax validation)
+- **Tier 2: Verification (`CANDIDATE`):** 366.1 ms (Docker/subprocess sandbox + boundary fuzzing)
+- **Tier 3: Promotion Gate (`ACTIVE`):** 19.4 ms (RiskEngine + HMAC signature)
+- **Total Cold Synthesis:** 405.9 ms
+- **Pre-Warmed Registry Lookup:** 19.540 ms (cold start eliminated)
 
-### 3. PyO3 Native JIT Optimization
-- **Workload 1 (Monte Carlo VaR):** 11.5x speedup (946,970 paths/sec native vs 82,240 paths/sec Python)
-- **Workload 2 (Online Volatility):** 3.4x speedup
+### 3. Computational Acceleration & JIT Optimization
+- **Execution Backend Measured:** Algorithmic Vectorization (Python Analytical Closed-Form)
+- **Workload 1 (Monte Carlo VaR):** 8.5x speedup (1,425,517 paths/sec accelerated vs 167,616 paths/sec Python)
+  - *95% Confidence Intervals:* Python [567.5 – 625.7] ms vs Accelerated [61.1 – 79.2] ms
+- **Workload 2 (Online Volatility):** 4.1x speedup (Welford O(N) streaming variance vs O(N·W) slice)
+  - *95% Confidence Intervals:* Python [157.3 – 193.4] ms vs Accelerated [39.1 – 47.0] ms
 - **Mathematical Parity Verified:** Yes (within tolerance)
+- **Statistical & Toolchain Note:** When the host environment contains `cargo` + `maturin`, hot-path transpilation compiles to native machine code (`.pyd`/`.so`). When the Rust toolchain is absent, CapForge falls back to closed-form analytical vectorization. Subprocess isolation mode in Section 1 measures OS process barrier creation (~140ms), not computational loop transpilation speed.
 
 ### 4. Verification Battery Throughput
-- **Sustained Throughput:** 48,204 capabilities/min (803.4 caps/sec)
-- **Average Verification Latency:** 6.8 ms/cap
-- **Pass Rate:** 15/15 (100%)
+- **Sustained Throughput:** 82,127 capabilities/min (1368.8 caps/sec)
+- **Average Verification Latency:** 18.6 ms/cap
+- **Pass Rate:** 50/50 (100%)
 
 ---
 *Automated report generated by CapForge Master Benchmark Suite.*

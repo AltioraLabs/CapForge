@@ -12,13 +12,20 @@ breaking down exact phase timings:
 from __future__ import annotations
 
 import logging
+import sys
 import time
+from pathlib import Path
 from typing import Any
+
+# Ensure repo root is on sys.path
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from rich.console import Console
 from rich.table import Table
 
-from benchmarks.stats import compute_stats
+from benchmarks.stats import compute_stats, format_ci95
 from capforge.core.models import PromotionMode, PromotionPolicy
 from capforge.runtime.agent_adapter import CapForgeAgent
 from capforge.runtime.async_synthesis import AsyncSynthesisManager, SynthesisPhase
@@ -171,6 +178,7 @@ def run_benchmark(iterations: int = 3) -> dict[str, Any]:
     table.add_column("Synthesis Pipeline Stage", style="bold cyan")
     table.add_column("Median (p50)", justify="right", style="bold green")
     table.add_column("Mean ± Stddev", justify="right")
+    table.add_column("95% Conf. Interval", justify="right", style="yellow")
     table.add_column("Resulting Status", justify="center", style="yellow")
     table.add_column("Operational Behavior", style="dim")
 
@@ -178,6 +186,7 @@ def run_benchmark(iterations: int = 3) -> dict[str, Any]:
         "Immediate Async Fallback",
         f"{fallback_dispatch_ms:.2f} ms",
         f"{fallback_dispatch_ms:.2f} ms",
+        "-",
         "[dim]None[/dim]",
         "Caller resumes immediately with fallback response without blocking",
     )
@@ -185,6 +194,7 @@ def run_benchmark(iterations: int = 3) -> dict[str, Any]:
         "Tier 1: L0+L1 Fast Check",
         f"{stats_fast['p50']:.1f} ms",
         f"{stats_fast['mean']:.1f} ± {stats_fast['stddev']:.1f} ms",
+        format_ci95(stats_fast, "ms"),
         "[yellow]DRAFT[/yellow]",
         "AST security scan + syntax validation (usable for low-risk paths)",
     )
@@ -192,6 +202,7 @@ def run_benchmark(iterations: int = 3) -> dict[str, Any]:
         "Tier 2: L2-L5 Verification",
         f"{stats_verify['p50']:.1f} ms",
         f"{stats_verify['mean']:.1f} ± {stats_verify['stddev']:.1f} ms",
+        format_ci95(stats_verify, "ms"),
         "[cyan]CANDIDATE[/cyan]",
         "Container sandbox execution + fuzzing + invariant regression check",
     )
@@ -199,6 +210,7 @@ def run_benchmark(iterations: int = 3) -> dict[str, Any]:
         "Tier 3: Promotion Gate",
         f"{stats_gate['p50']:.1f} ms",
         f"{stats_gate['mean']:.1f} ± {stats_gate['stddev']:.1f} ms",
+        format_ci95(stats_gate, "ms"),
         "[bold green]ACTIVE[/bold green]",
         "Risk classification, human governance policy, HMAC signature",
     )
@@ -206,6 +218,7 @@ def run_benchmark(iterations: int = 3) -> dict[str, Any]:
         "Total Cold Synthesis (End-to-End)",
         f"[bold]{stats_total['p50']:.1f} ms[/bold]",
         f"{stats_total['mean']:.1f} ± {stats_total['stddev']:.1f} ms",
+        format_ci95(stats_total, "ms"),
         "[bold green]ACTIVE[/bold green]",
         "Complete autonomous resolution from gap discovery to active tool",
     )
@@ -213,6 +226,7 @@ def run_benchmark(iterations: int = 3) -> dict[str, Any]:
         "Pre-Warmed Registry Hit (Cached)",
         f"{stats_cache['p50']:.3f} ms",
         f"{stats_cache['mean']:.3f} ms",
+        format_ci95(stats_cache, "ms"),
         "[bold green]ACTIVE[/bold green]",
         "Subsequent requests hit pre-warmed registry in < 1 ms (cold start eliminated)",
     )

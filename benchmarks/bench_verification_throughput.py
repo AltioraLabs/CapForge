@@ -15,13 +15,20 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+import sys
 import time
+from pathlib import Path
 from typing import Any
+
+# Ensure repo root is on sys.path
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from rich.console import Console
 from rich.table import Table
 
-from benchmarks.stats import compute_stats
+from benchmarks.stats import compute_stats, format_ci95
 from capforge.core.models import (
     Capability,
     CapabilityStatus,
@@ -155,12 +162,13 @@ def run_benchmark(
             "latency_p50_ms": stats["p50"],
             "latency_p95_ms": stats["p95"],
             "latency_mean_ms": stats["mean"],
+            "latency_ci95": format_ci95(stats, "ms"),
         }
 
         table.add_row(
             f"{c} worker(s)",
             f"{duration_sec:.2f} s",
-            f"{stats['p50']:.1f} / {stats['p95']:.1f} ms",
+            f"{stats['p50']:.1f} / {stats['p95']:.1f} ms [{stats['ci95_low']:.1f}–{stats['ci95_high']:.1f}]",
             f"{caps_per_sec:.1f} caps/s",
             f"[bold green]{caps_per_min:,.0f} caps/min[/bold green]",
             efficiency_str,

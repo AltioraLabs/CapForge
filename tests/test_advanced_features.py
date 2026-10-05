@@ -260,6 +260,53 @@ def test_smt_verifier_degrades_without_solvers(sample_monte_carlo_capability):
     assert "sympy" in report.diagnostics or "z3" in report.diagnostics
 
 
+def test_smt_generic_non_financial_capability():
+    """Verify SMT theorem proving on an arbitrary non-financial capability.
+
+    Proves test assertion consistency, zero-division safety, and SymPy finiteness
+    without requiring or forcing quantitative/financial domain assumptions.
+    """
+    pytest.importorskip("sympy", reason="optional SMT dependency not installed")
+    pytest.importorskip("z3", reason="optional SMT dependency not installed")
+
+    generic_cap = Capability(
+        id="text_token_counter",
+        name="Token Counter",
+        description="Calculates tokens and token ratios",
+        domain="nlp",
+        code_body="""
+def execute(inputs: dict) -> dict:
+    text = inputs.get("text", "")
+    words = text.split()
+    count = len(words)
+    total_len = sum(len(w) for w in words)
+    avg_len = total_len / count if count > 0 else 0.0
+    return {"status": "SUCCESS", "token_count": count, "avg_token_len": avg_len}
+""",
+        inputs={"text": ParameterSpec(name="text", type="string", required=True)},
+        outputs={"status": ParameterSpec(name="status", type="string")},
+        verification_tests=[
+            TestCase(
+                id="test_token_positive",
+                name="Positive tokens test",
+                test_type=TestType.HAPPY_PATH,
+                inputs={"text": "capforge formal verification"},
+                assert_expression="output['status'] == 'SUCCESS' and output['token_count'] > 0 and output['avg_token_len'] >= 0.0",
+            )
+        ],
+    )
+
+    verifier = SMTInvariantVerifier()
+    report = verifier.verify_invariants(generic_cap)
+
+    assert report.passed is True
+    assert report.static_contracts_passed is True
+    assert report.smt_invariants_passed is True
+    assert len(report.invariants_proven) >= 2
+    assert any("assertion invariant" in p.lower() for p in report.invariants_proven)
+    assert any("zero-division safety" in p.lower() for p in report.invariants_proven)
+
+
 # ---------------------------------------------------------------------------
 # 5. Bi-Directional Model Context Protocol (MCP) Tests
 # ---------------------------------------------------------------------------

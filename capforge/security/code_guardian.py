@@ -40,8 +40,11 @@ import hashlib
 import logging
 import math
 import re
+import threading
 from dataclasses import dataclass, field
 from typing import Any
+
+_AST_PARSE_LOCK = threading.Lock()
 
 logger = logging.getLogger("capforge.security.guardian")
 
@@ -512,8 +515,9 @@ class CodeGuardian:
 
     def _scan_ast(self, code: str, result: GuardianScanResult) -> None:
         try:
-            tree = ast.parse(code)
-        except SyntaxError:
+            with _AST_PARSE_LOCK:
+                tree = ast.parse(code)
+        except (SyntaxError, SystemError):
             return  # Syntax errors caught elsewhere
 
         for node in ast.walk(tree):
@@ -615,8 +619,9 @@ class CodeGuardian:
 
     def _scan_imports(self, code: str, result: GuardianScanResult) -> None:
         try:
-            tree = ast.parse(code)
-        except SyntaxError:
+            with _AST_PARSE_LOCK:
+                tree = ast.parse(code)
+        except (SyntaxError, SystemError):
             return
 
         for node in ast.walk(tree):

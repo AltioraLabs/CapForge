@@ -78,6 +78,7 @@ def compute_stats(samples: list[float], unit: str = "us") -> dict[str, Any]:
         "stderr": round(stderr_val, 2),
         "ci95_low": round(max(0.0, mean_val - ci95_margin), 2),
         "ci95_high": round(mean_val + ci95_margin, 2),
+        "ci95_margin": round(ci95_margin, 2),
         "throughput_ops_sec": round(throughput, 1),
     }
 
@@ -87,3 +88,10 @@ def format_latency(val_us: float) -> str:
     if val_us >= 1000.0:
         return f"{val_us / 1000.0:.2f} ms"
     return f"{val_us:.2f} µs"
+
+
+def format_ci95(stats: dict[str, Any], unit: str = "ms") -> str:
+    """Format confidence interval as '[low – high] unit'."""
+    low = stats.get("ci95_low", 0.0)
+    high = stats.get("ci95_high", 0.0)
+    return f"[{low:.1f} – {high:.1f}] {unit}"

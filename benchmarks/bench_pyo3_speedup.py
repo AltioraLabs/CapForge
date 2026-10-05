@@ -16,13 +16,40 @@ from __future__ import annotations
 import gc
 import math
 import random
+import sys
 import time
+from pathlib import Path
 from typing import Any
 
+# Ensure repo root is on sys.path
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
-from benchmarks.stats import compute_stats
+from benchmarks.stats import compute_stats, format_ci95
+
+
+def detect_execution_backend() -> dict[str, Any]:
+    """Detect whether compiled PyO3 native extensions are loaded or if algorithmic vectorization is used."""
+    try:
+        from capforge.native import monte_carlo_var  # type: ignore # noqa: F401
+        return {
+            "is_native_rust": True,
+            "label": "PyO3 Compiled Rust (.pyd/.so Native Binary)",
+            "short_label": "PyO3 Native",
+            "notes": "Native Rust machine code compiled via PyO3/maturin",
+        }
+    except ImportError:
+        return {
+            "is_native_rust": False,
+            "label": "Algorithmic Vectorization (Python Analytical Closed-Form)",
+            "short_label": "Vectorized Py",
+            "notes": "Python analytical closed-form reduction (Rust toolchain/maturin not pre-compiled)",
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +218,8 @@ def run_benchmark(
     stats_py_vol = compute_stats(py_vol_times, unit="ms")
     stats_nat_vol = compute_stats(native_vol_times, unit="ms")
 
+    backend_info = detect_execution_backend()
+
     speedup_mc = stats_py_mc["mean"] / stats_nat_mc["mean"] if stats_nat_mc["mean"] > 0 else 1.0
     speedup_vol = stats_py_vol["mean"] / stats_nat_vol["mean"] if stats_nat_vol["mean"] > 0 else 1.0
 
@@ -200,64 +229,97 @@ def run_benchmark(
     results: dict[str, Any] = {
         "simulations": simulations,
         "trials": trials,
+        "backend": backend_info,
+        "backend_label": backend_info["short_label"],
         "parity_verified": mc_parity and vol_parity,
         "monte_carlo": {
             "pure_python": stats_py_mc,
-            "native_optimized": stats_nat_mc,
+            "accelerated": stats_nat_mc,
+            "native_optimized": stats_nat_mc,  # backward compatibility for tests
+            "backend": backend_info["label"],
             "speedup_factor": round(speedup_mc, 2),
             "throughput_python_paths_sec": round(throughput_py_paths, 0),
             "throughput_native_paths_sec": round(throughput_nat_paths, 0),
+            "ci95_python": format_ci95(stats_py_mc, "ms"),
+            "ci95_accelerated": format_ci95(stats_nat_mc, "ms"),
         },
         "moving_volatility": {
             "pure_python": stats_py_vol,
-            "native_optimized": stats_nat_vol,
+            "accelerated": stats_nat_vol,
+            "native_optimized": stats_nat_vol,  # backward compatibility for tests
+            "backend": "Welford Online Streaming Variance O(N)",
             "speedup_factor": round(speedup_vol, 2),
+            "ci95_python": format_ci95(stats_py_vol, "ms"),
+            "ci95_accelerated": format_ci95(stats_nat_vol, "ms"),
         },
         "speedup_factor": round(speedup_mc, 2),
     }
 
-    # Visual Output
+    # Visual Output Table with Confidence Intervals and Clear Backend Labeling
     table = Table(
-        title=f"CapForge PyO3 Optimization Benchmark ({simulations:,} Monte Carlo Paths & Online Volatility)",
+        title=f"CapForge Computational Acceleration Benchmark ({simulations:,} Monte Carlo Paths & Online Volatility)",
         show_header=True,
         header_style="bold magenta",
     )
     table.add_column("Workload / Pipeline Path", style="bold white")
-    table.add_column("Mean Latency ± Stddev", justify="right")
+    table.add_column("Implementation / Backend", style="cyan")
+    table.add_column("Mean ± Stddev", justify="right")
+    table.add_column("95% Conf. Interval", justify="right", style="yellow")
     table.add_column("Throughput", justify="right")
     table.add_column("Speedup Multiplier", justify="right", style="bold green")
     table.add_column("Parity", justify="center")
 
     table.add_row(
-        "Monte Carlo VaR (Pure Python)",
+        "Monte Carlo VaR (Baseline)",
+        "Pure Python (10-Step Euler GBM)",
         f"{stats_py_mc['mean']:.1f} ± {stats_py_mc['stddev']:.1f} ms",
+        format_ci95(stats_py_mc, "ms"),
         f"{throughput_py_paths:,.0f} paths/s",
-        "1.0x (baseline)",
+        "1.0x (ref)",
         "OK",
     )
     table.add_row(
-        "Monte Carlo VaR (PyO3 Native)",
+        "Monte Carlo VaR (Accelerated)",
+        backend_info["short_label"],
         f"{stats_nat_mc['mean']:.1f} ± {stats_nat_mc['stddev']:.1f} ms",
+        format_ci95(stats_nat_mc, "ms"),
         f"{throughput_nat_paths:,.0f} paths/s",
         f"[bold green]{speedup_mc:.1f}x[/bold green]",
         "[green]PASS[/green]" if mc_parity else "[yellow]FAIL[/yellow]",
     )
     table.add_row(
-        "Online Volatility Filter (Python)",
+        "Online Volatility Filter (Baseline)",
+        "Pure Python (Naive O(N·W) Slice)",
         f"{stats_py_vol['mean']:.1f} ± {stats_py_vol['stddev']:.1f} ms",
+        format_ci95(stats_py_vol, "ms"),
         "-",
-        "1.0x (baseline)",
+        "1.0x (ref)",
         "OK",
     )
     table.add_row(
-        "Online Volatility Filter (Native)",
+        "Online Volatility Filter (Accelerated)",
+        "Algorithmic (Welford O(N) Streaming)",
         f"{stats_nat_vol['mean']:.1f} ± {stats_nat_vol['stddev']:.1f} ms",
+        format_ci95(stats_nat_vol, "ms"),
         "-",
         f"[bold green]{speedup_vol:.1f}x[/bold green]",
         "[green]PASS[/green]" if vol_parity else "[yellow]FAIL[/yellow]",
     )
 
     console.print(table)
+
+    notes_content = (
+        "[bold yellow]Benchmark Rigor & Statistical Methodology Notes:[/bold yellow]\n"
+        f"• [bold]Active Acceleration Mode:[/bold] {backend_info['label']}.\n"
+        "  - [bold]True PyO3 Rust Compilation:[/bold] Hot-path transpilation compiles code via `maturin` and `cargo`\n"
+        "    into native machine code (`.pyd` / `.so`). When the Rust toolchain is absent, CapForge transparently\n"
+        "    accelerates mathematical capability paths using closed-form analytical vectorization.\n"
+        "• [bold]Workload 2 Context:[/bold] Compares naive O(N·W) slice variance against Welford's streaming variance O(N).\n"
+        "• [bold]Statistical Rigor:[/bold] 95% Confidence Intervals calculated via Student's t distribution: CI_95 = mean ± 1.96 * SEM.\n"
+        "• [bold]Subprocess Sandboxing Overhead:[/bold] Subprocess isolation in `bench_execution_overhead.py` measures\n"
+        "    full OS process creation barriers (~140ms), not computational loop transpilation speed."
+    )
+    console.print(Panel(notes_content, title="[bold]Statistical Notes[/bold]", border_style="dim"))
     return results
 
 

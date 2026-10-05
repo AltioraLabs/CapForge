@@ -34,6 +34,13 @@ def test_submit_synthesis_returns_immediate_fallback():
     assert job is not None
     assert job.task_intent == "calculate compound interest"
 
+    # Allow worker thread to settle before next test
+    for _ in range(30):
+        j = manager.get_job(resp.job_id)
+        if j and j.phase in (SynthesisPhase.COMPLETED, SynthesisPhase.FAILED):
+            break
+        time.sleep(0.05)
+
 
 def test_async_synthesis_completes_in_background():
     """Verify that background worker executes synthesis through completion."""

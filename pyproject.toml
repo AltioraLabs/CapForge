@@ -67,6 +67,9 @@ testpaths = [
 ]
 pythonpath = ["."]
 asyncio_mode = "auto"
+markers = [
+    "requires_network: tests requiring external network access or live DNS resolution",
+]
 
 [tool.ruff]
 target-version = "py311"

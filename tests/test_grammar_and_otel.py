@@ -217,7 +217,10 @@ class TestOpenTelemetryObservability:
         assert res.passed
 
         # Check that spans were recorded
-        eval_spans = trace_manager.list_spans(name="capforge.verification.evaluate")
+        eval_spans = [
+            s for s in trace_manager.list_spans(name="capforge.verification.evaluate")
+            if s.attributes.get(GenAISemanticConventions.CAPABILITY_ID) == "telemetry_test_cap"
+        ]
         assert len(eval_spans) >= 1
         assert eval_spans[0].attributes[GenAISemanticConventions.CAPABILITY_ID] == "telemetry_test_cap"
         assert eval_spans[0].attributes[GenAISemanticConventions.VERIFICATION_PASSED] is True

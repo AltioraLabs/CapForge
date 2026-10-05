@@ -7,7 +7,7 @@
 [![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/AltioraLabs/CapForge)
 [![Python: 3.10 | 3.11 | 3.12](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Tests: 234/234 Passed](https://img.shields.io/badge/tests-234%2F234%20Passed%20(100%25)-brightgreen.svg)](tests/)
+[![Tests: 289/290 Passed](https://img.shields.io/badge/tests-289%2F290%20Passed%20(99.7%25)-brightgreen.svg)](tests/)
 [![Code Style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![MCP: 2024-11-05](https://img.shields.io/badge/MCP-STDIO%20%7C%20SSE-purple.svg)](https://modelcontextprotocol.io/)
 [![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-red.svg)](https://docs.pydantic.dev/)
@@ -15,7 +15,7 @@
 
 **Turn static AI agents into continuously evolving, self-healing systems that discover capability gaps, synthesize type-safe code, verify through SMT theorem proving, compile hot-paths into Rust, and safely govern execution &mdash; without retraining foundation models.**
 
-[Interactive Documentation](docs/site/index.html) &bull; [Quickstart](#-quickstart-in-30-seconds) &bull; [Architecture](#-three-plane-architecture) &bull; [5-Level Verification](#-5-level-verification-pipeline) &bull; [MCP Server](#-model-context-protocol-mcp) &bull; [Rust Transpiler](#-python-to-rust-pyo3-transpiler)
+[Interactive Documentation](docs/site/index.html) &bull; [Quickstart](#-quickstart-in-30-seconds) &bull; [Architecture](#-three-plane-architecture) &bull; [Registry Seeding](#-seeding-your-registry--warm-up-strategy) &bull; [5-Level Verification](#-5-level-verification-pipeline) &bull; [MCP Server](#-model-context-protocol-mcp) &bull; [Rust Transpiler](#-python-to-rust-pyo3-transpiler)
 
 </div>
 
@@ -49,7 +49,14 @@ pip install git+https://github.com/AltioraLabs/CapForge.git
 pip install "capforge[all]"
 ```
 
-### 2. High-Level Python SDK (`@capability` & `CapForgeClient`)
+### 2. Pre-Warm Registry (Eliminate Cold Starts)
+
+```bash
+# Pre-warm with baseline enterprise capabilities across finance, devops, nlp, and data
+capforge seed --domain all
+```
+
+### 3. High-Level Python SDK (`@capability` & `CapForgeClient`)
 
 ```python
 from capforge import CapForgeClient, capability
@@ -91,7 +98,7 @@ with CapForgeClient() as client:
     crew_tool = client.to_crewai_tool("sentiment_analyzer")
 ```
 
-### 3. Verify System Diagnostics
+### 4. Verify System Diagnostics
 
 ```bash
 # Run production readiness checks on SQLite WAL, sandbox, and governance
@@ -138,6 +145,125 @@ CapForge strictly decouples low-latency deterministic agent execution from async
 
 ---
 
+## 🌱 Seeding Your Registry & Warm-Up Strategy
+
+### The Cold-Start Problem in Autonomous Tool Runtimes
+
+When an agent encounters a capability gap against an **empty or un-warmed registry**, CapForge invokes its complete synthesis pipeline:
+1. **Contract Mining:** Analyzes intent, parameter specs, and expected return schemas.
+2. **LLM Code Synthesis:** Synthesizes self-contained Python code.
+3. **Closed-Loop AST Repair:** Executes up to 3 passes (Heuristic &rarr; LLM Reflection &rarr; Type Coercion).
+4. **5-Level Verification Battery:** Runs CodeGuardian AST security, Z3/SymPy SMT invariant proofs, Docker/subprocess container sandbox execution, property fuzzing, and mutation testing.
+
+> [!WARNING]
+> **Cold Synthesis Latency:** Full end-to-end synthesis takes **15–90 seconds** (depending on LLM API response latency and SMT solver complexity). In synchronous agent loops, an un-warmed registry will cause tool call timeouts on the very first user interaction.
+
+---
+
+### CapForge's Two-Tier Solution to Cold Starts
+
+#### Tier 1: Zero-Blocking Async Synthesis (First Incident Graceful Degradation)
+When an agent experiences a gap in production, CapForge **never blocks the host agent thread for 90 seconds**. The `submit_synthesis()` API returns an immediate fallback response in **under 10ms**:
+
+```python
+from capforge.runtime.async_synthesis import AsyncSynthesisManager
+
+manager = AsyncSynthesisManager()
+resp = manager.submit_synthesis(
+    task_intent="calculate compound interest",
+    fallback_output={"estimated_rate": 0.05, "status": "provisional_estimate"}
+)
+
+# Immediate return (< 10ms):
+print(resp.status)           # "SYNTHESIS_QUEUED"
+print(resp.fallback_output)  # {"estimated_rate": 0.05, "status": "provisional_estimate"}
+print(resp.job_id)           # "async_1741549200_a1b2c3d4"
+print(resp.poll_endpoint)    # "/v1/synthesis/async_1741549200_a1b2c3d4"
+```
+
+1. **Host Agent Execution Continues:** The agent uses the provisional fallback output without dropping the user's conversational turn.
+2. **Background Synthesis & Formal Proofs:** Worker threads synthesize, formally verify via Z3, and sandbox-test the tool in the background.
+3. **Automatic Promotion & Webhook:** Once verified, the capability is promoted to `ACTIVE` in SQLite/PostgreSQL, and an HMAC-signed webhook event (`skill_promoted`) notifies your agent cluster. Subsequent requests execute deterministically in **< 5ms**.
+
+---
+
+#### Tier 2: Registry Pre-Warming via `capforge seed` CLI Walkthrough
+
+To prevent the cold-start synthesis path from triggering during critical user-facing traffic, pre-warm your registry during container initialization, CI/CD, or deployment:
+
+```bash
+# Seed baseline enterprise capabilities across all 4 domains
+capforge seed --domain all
+```
+
+**Live CLI Output:**
+```text
+                      CapForge Seeded Capabilities (ALL)                       
++-----------------------------------------------------------------------------+
+| Capability ID           | Domain  | Name                           | Status |
+|-------------------------+---------+--------------------------------+--------|
+| calculate_value_at_risk | finance | Calculate Value-at-Risk        | ACTIVE |
+| calculate_volatility    | finance | Calculate Annualized           | ACTIVE |
+|                         |         | Volatility                     |        |
+| calculate_max_drawdown  | finance | Calculate Maximum Drawdown     | ACTIVE |
+| git_commit_analyzer     | devops  | Git Commit Message Analyzer    | ACTIVE |
+| dockerfile_linter       | devops  | Dockerfile Security Linter     | ACTIVE |
+| token_counter           | nlp     | Token & Cost Estimator         | ACTIVE |
+| keyword_extractor       | nlp     | Keyphrase & Term Frequency     | ACTIVE |
+|                         |         | Extractor                      |        |
+| outlier_detector_zscore | data    | Z-Score Anomaly Detector       | ACTIVE |
++-----------------------------------------------------------------------------+
+Successfully seeded 8 capabilities into the Capability Registry.
+```
+
+##### Supported Domain Seed Catalogs
+
+| Domain | CLI Command | Pre-Seeded Production Tools | Common Agent Use Cases |
+| :--- | :--- | :--- | :--- |
+| **Finance** | `capforge seed -d finance` | `calculate_value_at_risk`, `calculate_volatility`, `calculate_max_drawdown` | Financial analysts, portfolio risk agents, quantitative trading bots. |
+| **DevOps** | `capforge seed -d devops` | `git_commit_analyzer`, `dockerfile_linter` | Coding assistants, CI/CD automation agents, code review bots. |
+| **NLP** | `capforge seed -d nlp` | `token_counter`, `keyword_extractor` | Cost tracking, context window optimization, content summarization agents. |
+| **Data** | `capforge seed -d data` | `outlier_detector_zscore` | Data cleansing, anomaly detection, tabular data analytics. |
+| **All** | `capforge seed -d all` | Complete baseline across all 4 domains (8 tools) | General-purpose autonomous agent runtimes. |
+
+---
+
+### Programmatic Seeding in Python
+
+When running CapForge as an embedded library in your service:
+
+```python
+from capforge import CapForgeClient
+from capforge.seed import seed_domain, get_available_domains
+
+# 1. Inspect supported seed domains
+print(get_available_domains())  # ['finance', 'devops', 'nlp', 'data']
+
+# 2. Warm up registry at application startup
+with CapForgeClient() as client:
+    seeded = seed_domain("all", registry=client.registry)
+    print(f"Pre-warmed {len(seeded)} capabilities into registry.")
+
+    # 3. Execute immediately with zero synthesis delay (< 5ms)
+    res = client.execute("calculate_value_at_risk", {
+        "returns": [0.02, -0.05, 0.01, -0.03, 0.04],
+        "confidence": 0.95
+    })
+    print("VaR Result:", res.output)
+```
+
+---
+
+### Production First-Incident Playbook
+
+| Phase | Operational State | Engine Action | SLA Impact |
+| :--- | :--- | :--- | :--- |
+| **Day-0 (Deploy)** | Cold Container Spin-Up | Execute `capforge seed --domain all` in Dockerfile or Kubernetes init container. Mount persistent volume for SQLite WAL or configure Postgres. | Zero cold-start latency for all standard domain capabilities. |
+| **Day-1 (Unseen Gap)** | Agent requests unknown tool | Agent returns `SynthesisFallbackResponse` (`SYNTHESIS_QUEUED`) with provisional estimate. Background worker triggers 5-level verification. | Agent never stalls or drops conversation; fallback returned in **< 10ms**. |
+| **Day-1+ (Promoted)** | Synthesis verified & signed | Capability promoted to `ACTIVE`; HMAC webhook dispatched. Dynamic router hot-swaps live tool. | All subsequent calls execute deterministically in **< 5ms**. |
+
+---
+
 ## 🛡️ 5-Level Verification Pipeline
 
 Every capability synthesized or upgraded in CapForge must pass an uncompromising 5-level verification matrix before entering production:
@@ -153,27 +279,30 @@ Every capability synthesized or upgraded in CapForge must pass an uncompromising
 
 ---
 
-## ⚡ Python-to-Rust PyO3 Transpiler
+## ⚡ Python-to-Rust / PyO3 Multi-Tier Transpiler
 
 When OpenTelemetry telemetry detects that a capability's computational loops (e.g., Monte Carlo simulations, numerical parsers, iterative transforms) cause latency bottlenecks, CapForge's runtime profiler triggers an `OPTIMIZATION_GAP` event:
 
-1. **AST Hot-Path Detection:** Identifies tight loops and heavy arithmetic.
-2. **PyO3 Rust Kernel Synthesis:** Synthesizes a native Rust extension module with memory-safe concurrency.
-3. **Parity Verification:** Re-runs the full 5-level test suite against the compiled Rust artifact.
-4. **Zero-Downtime Swap:** Automatically routes future executions to the compiled `.so` / `.pyd` module, delivering **20x&ndash;100x lower latency**.
+1. **AST Hot-Path Detection:** Identifies tight loops, recursive accumulators, and heavy arithmetic complexity.
+2. **Tier 1 — Compiled PyO3 Rust Extension:** When host toolchains (`cargo` & `maturin`) are available, scaffolds a complete Rust crate, generates PyO3 bindings, compiles native machine code (`.pyd` on Windows / `.so` on Linux), and produces a native execution shim (**20x&ndash;100x speedups** on raw CPU loops).
+3. **Tier 2 — Vectorized NumPy Kernel:** When the Rust toolchain is absent, synthesizes vectorized array implementations (**3.5x&ndash;12x speedups**).
+4. **Empirical Verification & Wall-Clock Measurement:** Re-runs the full 5-level test suite against the accelerated artifact and measures genuine wall-clock speedup (`time.perf_counter()`) across 25 iterations &mdash; never reporting hardcoded ratios.
+5. **Zero-Downtime Hot-Swap:** Automatically registers the optimized capability in the registry with version lineage (`1.0.0` &rarr; `1.1.0-opt`).
 
 ```python
-from capforge.optimization.profiler import RuntimeProfiler
-from capforge.optimization.transpiler import HotPathTranspiler
+from capforge.optimization import RustTranspiler
 
-# 1. Profile telemetry and flag bottlenecks
-profiler = RuntimeProfiler(target_p95_ms=10.0)
-gap = profiler.check_optimization_gap("monte_carlo_var", "1.0.0")
+# 1. Initialize the multi-tier transpiler
+transpiler = RustTranspiler()
 
-# 2. Transpile Python source into native PyO3 Rust extension
-transpiler = HotPathTranspiler()
-optimized_artifact = transpiler.transpile_and_compile(gap.capability_id)
-print("Speedup Achieved:", optimized_artifact.speedup_factor)  # e.g., '48.2x'
+# 2. Transpile Python capability with functional equivalence verification
+success, opt_cap, diagnostics = transpiler.transpile_and_optimize(capability)
+
+if success:
+    tier = opt_cap.metadata.get("acceleration_tier")
+    speedup = opt_cap.metadata.get("measured_speedup_ratio")
+    print(f"Accelerated via {tier}: {speedup}x empirical speedup")
+    print(f"Diagnostics: {diagnostics}")
 ```
 
 ---

@@ -75,14 +75,21 @@ def generate_markdown_report(summary_data: dict, results: dict, system_info: dic
     md.append(f"- **Total Cold Synthesis:** {sy['total_median_ms']:.1f} ms")
     md.append(f"- **Pre-Warmed Registry Lookup:** {sy['cached_lookup_median_ms']:.3f} ms (cold start eliminated)")
     md.append("")
-    md.append("### 3. PyO3 Native JIT Optimization")
+    md.append("### 3. Computational Acceleration & JIT Optimization")
     pyo = results["pyo3_speedup"]
     mc = pyo.get("monte_carlo", {})
-    md.append(f"- **Workload 1 (Monte Carlo VaR):** {mc.get('speedup_factor', pyo['speedup_factor']):.1f}x speedup ({mc.get('throughput_native_paths_sec', 0):,.0f} paths/sec native vs {mc.get('throughput_python_paths_sec', 0):,.0f} paths/sec Python)")
+    backend_desc = pyo.get("backend", {}).get("label", pyo.get("backend_label", "Algorithmic / PyO3"))
+    md.append(f"- **Execution Backend Measured:** {backend_desc}")
+    md.append(f"- **Workload 1 (Monte Carlo VaR):** {mc.get('speedup_factor', pyo['speedup_factor']):.1f}x speedup ({mc.get('throughput_native_paths_sec', 0):,.0f} paths/sec accelerated vs {mc.get('throughput_python_paths_sec', 0):,.0f} paths/sec Python)")
+    if "ci95_python" in mc and "ci95_accelerated" in mc:
+        md.append(f"  - *95% Confidence Intervals:* Python {mc['ci95_python']} vs Accelerated {mc['ci95_accelerated']}")
     if "moving_volatility" in pyo:
         mv = pyo["moving_volatility"]
-        md.append(f"- **Workload 2 (Online Volatility):** {mv.get('speedup_factor', 1.0):.1f}x speedup")
+        md.append(f"- **Workload 2 (Online Volatility):** {mv.get('speedup_factor', 1.0):.1f}x speedup (Welford O(N) streaming variance vs O(N·W) slice)")
+        if "ci95_python" in mv and "ci95_accelerated" in mv:
+            md.append(f"  - *95% Confidence Intervals:* Python {mv['ci95_python']} vs Accelerated {mv['ci95_accelerated']}")
     md.append(f"- **Mathematical Parity Verified:** {'Yes (within tolerance)' if pyo.get('parity_verified') else 'No'}")
+    md.append("- **Statistical & Toolchain Note:** When the host environment contains `cargo` + `maturin`, hot-path transpilation compiles to native machine code (`.pyd`/`.so`). When the Rust toolchain is absent, CapForge falls back to closed-form analytical vectorization. Subprocess isolation mode in Section 1 measures OS process barrier creation (~140ms), not computational loop transpilation speed.")
     md.append("")
     md.append("### 4. Verification Battery Throughput")
     vt = results["verification_throughput"]
@@ -265,19 +272,20 @@ def main() -> None:
         "status": "PASS",
     })
 
-    # 7. PyO3 Speedup
+    # 7. Computational Acceleration & JIT Optimization
     speedup = res_pyo3["speedup_factor"]
+    backend_short = res_pyo3.get("backend_label", "PyO3 / Vectorized")
     pyo3_status = "PASS" if speedup >= 3.0 else "ACCEPTABLE"
     summary_table.add_row(
-        "PyO3 JIT Optimization",
-        "Monte Carlo hot-path native acceleration",
+        "Computational Acceleration",
+        f"Monte Carlo hot-path ({backend_short})",
         f"{speedup:.1f}x speedup",
         "> 3.0x",
         f"[bold green]{pyo3_status}[/bold green]",
     )
     sla_rows.append({
-        "category": "PyO3 JIT Optimization",
-        "metric": "Monte Carlo hot-path native acceleration",
+        "category": "Computational Acceleration",
+        "metric": f"Monte Carlo hot-path ({backend_short})",
         "result": f"{speedup:.1f}x speedup",
         "target": "> 3.0x",
         "status": pyo3_status,
